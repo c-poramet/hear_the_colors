@@ -27,14 +27,14 @@ C.cardRender = async (e, P, o = getOpts()) => {
   const MONO = '"Space Mono", monospace', UI = 'Inter, system-ui, sans-serif';
   const W = 1080, M = 36, PAD = 60, X0 = M + PAD, CW = W - 2 * X0, GAP = 52, MIN_H = 1080;
   const mc = document.createElement('canvas').getContext('2d');
-  const metadata = o.meta ? cardMeta(e) : '', birthday = o.birthday ? cardBirthday() : '', details = [metadata, birthday && 'BIRTHDATE ' + birthday].filter(Boolean).join(' · ');
-  const hasHead = o.brand || o.seed, hasText = o.title || o.color || o.length || details, hasId = o.cover || hasText, onlyFp = !hasId && !o.stats;
+  const metadata = o.meta ? cardMeta(e) : '', birthday = o.birthday ? cardBirthday() : '', details = metadata, birthDetail = birthday && 'BIRTHDATE ' + birthday;
+  const hasHead = o.brand || o.seed, hasText = o.title || o.color || o.length || details || birthDetail, hasId = o.cover || hasText, onlyFp = !hasId && !o.stats;
 
   // ---- measure
   const blocks = [];
   const head = { h: 52, draw: (g, y) => {
     if (o.brand) { g.fillStyle = c.l > .02 ? C.css(c) : '#f0f0f0'; g.beginPath(); g.arc(X0 + 8, y + 26, 8, 0, TAU); g.fill();
-      T(g, 'COLOR SEED', X0 + 30, y + 35, '600 30px ' + UI, '#f0f0f0', 'left', 2) }
+      T(g, 'HEAR & SEE', X0 + 30, y + 35, '600 30px ' + UI, '#f0f0f0', 'left', 2) }
     if (o.seed) { g.font = '700 24px ' + MONO; g.letterSpacing = '1px'; const label = 'SEED ' + seed, sw = g.measureText(label).width + 44; g.letterSpacing = '0px';
       g.fillStyle = 'rgba(201,127,80,.1)'; C.rr(g, X0 + CW - sw, y, sw, 52, 12); g.fill(); g.lineWidth = 2; g.strokeStyle = 'rgba(201,127,80,.22)'; g.stroke();
       T(g, label, X0 + CW - sw / 2, y + 34, '700 24px ' + MONO, '#c97f50', 'center', 1) }
@@ -45,22 +45,26 @@ C.cardRender = async (e, P, o = getOpts()) => {
   if (hasId) {
     if (o.cover && hasText) {
       const cov = 264, tx = X0 + cov + 44, tw = CW - cov - 44; mc.font = '600 50px ' + UI;
-      const lines = o.title ? wrap(mc, e.name, tw, 3) : [], titleH = lines.length * 62, detailH = details ? 30 : 0, botH = detailH + (o.color ? 56 : 0) + (o.length ? (o.color ? 16 : 0) + 24 : 0);
+      const lines = o.title ? wrap(mc, e.name, tw, 3) : [], titleH = lines.length * 62, detailH = (details ? 30 : 0) + (birthDetail ? 30 : 0), botH = detailH + (o.color ? 56 : 0) + (o.length ? (o.color ? 16 : 0) + 24 : 0);
       const h = Math.max(cov, titleH + (titleH && botH ? 28 : 0) + botH);
       id = { h, draw: (g, y) => { drawCover(g, X0, y + (h - cov) / 2, cov);
         lines.forEach((l, i) => T(g, l, tx, y + 46 + i * 62, '600 50px ' + UI, '#f0f0f0'));
         let by = y + (h - cov) / 2 + cov - botH; if (!lines.length) by = y + (h - botH) / 2;
-        if (details) { T(g, details, tx, y + titleH + 28, '400 20px ' + MONO, 'rgba(255,255,255,.48)', 'left', 1); by += detailH }
+        let detailY = y + titleH + 28;
+        if (details) { T(g, details, tx, detailY, '400 20px ' + MONO, 'rgba(255,255,255,.48)', 'left', 1); detailY += 30; by += 30 }
+        if (birthDetail) { T(g, birthDetail, tx, detailY, '400 20px ' + MONO, 'rgba(255,255,255,.48)', 'left', 1); by += 30 }
         if (o.color) { swatch(g, tx, by, 56, hex, 44); by += 56 + 16 }
         if (o.length) T(g, 'LENGTH ' + fmt(e.dur), tx, by + 20, '400 24px ' + MONO, 'rgba(255,255,255,.38)', 'left', 1) } };
     } else if (o.cover) {
       const cov = Math.min(CW, 520); id = { h: cov, draw: (g, y) => drawCover(g, X0 + (CW - cov) / 2, y, cov) };
     } else {
       const big = !o.stats && !o.fp, fs = big ? 72 : 60, lh = fs * 1.22; mc.font = `600 ${fs}px ` + UI;
-      const lines = o.title ? wrap(mc, e.name, CW, 3) : [], titleH = lines.length * lh, detailH = details ? 30 : 0, sw = big ? 76 : 60;
+      const lines = o.title ? wrap(mc, e.name, CW, 3) : [], titleH = lines.length * lh, detailH = (details ? 30 : 0) + (birthDetail ? 30 : 0), sw = big ? 76 : 60;
       const h = titleH + detailH + (o.color ? (titleH ? 28 : 0) + sw : 0) + (o.length ? ((titleH || o.color || details) ? 20 : 0) + 24 : 0);
       id = { h, draw: (g, y) => { let yy = y; lines.forEach((l, i) => T(g, l, X0, yy + fs * .95 + i * lh, `600 ${fs}px ` + UI, '#f0f0f0')); yy += titleH;
-        if (details) { yy += titleH ? 8 : 0; T(g, details, X0, yy + 20, '400 20px ' + MONO, 'rgba(255,255,255,.48)', 'left', 1); yy += detailH }
+        if (details || birthDetail) yy += titleH ? 8 : 0;
+        if (details) { T(g, details, X0, yy + 20, '400 20px ' + MONO, 'rgba(255,255,255,.48)', 'left', 1); yy += 30 }
+        if (birthDetail) { T(g, birthDetail, X0, yy + 20, '400 20px ' + MONO, 'rgba(255,255,255,.48)', 'left', 1); yy += 30 }
         if (o.color) { yy += titleH ? 28 : 0; swatch(g, X0, yy, sw, hex, big ? 64 : 48); yy += sw }
         if (o.length) { yy += (titleH || o.color) ? 20 : 0; T(g, 'LENGTH ' + fmt(e.dur), X0, yy + 20, '400 24px ' + MONO, 'rgba(255,255,255,.38)', 'left', 1) } } };
     }
@@ -110,7 +114,7 @@ C.cardRender = async (e, P, o = getOpts()) => {
       g.fillStyle = '#1f1f1f'; C.rr(g, x, y, cw, 108, 20); g.fill(); g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.07)'; g.stroke();
       T(g, v, x + 24, y + 56, '700 40px ' + MONO, '#f0f0f0'); T(g, l, x + 24, y + 88, '600 18px ' + UI, 'rgba(255,255,255,.38)', 'left', 1.6) }) } }
 
-  const foot = o.brand ? { h: 24, draw: (g, y) => T(g, 'Color Seed · see music, hear colour', X0, y + 20, '400 20px ' + MONO, 'rgba(255,255,255,.28)', 'left', 1) } : null;
+  const foot = o.brand ? { h: 24, draw: (g, y) => T(g, 'Hear & See · see music, hear colour', X0, y + 20, '400 20px ' + MONO, 'rgba(255,255,255,.28)', 'left', 1) } : null;
   const mid = [id, fp, st].filter(Boolean);
 
   // ---- layout: header on top, footer at the bottom, middle group centred between them

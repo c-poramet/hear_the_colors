@@ -1,6 +1,6 @@
-# Color Seed
+# Hear & See
 
-See music, hear colour. Load a song and Color Seed turns it into a colour: **hue** is where the song sits on the circle of fifths (its key area), **saturation** is rhythmic density (hits per second), **lightness** is the brightness of its timbre. Everything runs in your browser; audio never leaves your device.
+See music, hear colour. Load a song and Hear & See turns it into a colour: **hue** is where the song sits on the circle of fifths (its key area), **saturation** is rhythmic density (hits per second), **lightness** is the brightness of its timbre. Everything runs in your browser; audio never leaves your device.
 
 ## Pages
 

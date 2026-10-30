@@ -68,7 +68,7 @@ addEventListener('drop', e => { e.preventDefault(); $('stage').classList.remove(
 /* ---------- transport ---------- */
 $('pp').onclick = () => { if (!fr) return; ac.resume(); au.paused ? au.play() : au.pause() };
 ['play', 'pause', 'ended'].forEach(ev => au.addEventListener(ev, () => { $('pp').classList.toggle('playing', !au.paused); $('dot').classList.toggle('live', !au.paused);
-  document.title = au.paused ? 'Color Seed – Play' : '▶ ' + name + ' – Color Seed' }));
+  document.title = au.paused ? 'Hear & See – Play' : '▶ ' + name + ' – Hear & See' }));
 addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = document.activeElement.tagName; if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement.isContentEditable) return;
