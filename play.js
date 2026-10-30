@@ -107,7 +107,7 @@ function cutUI() {
 }
 $('cutbox').onclick = e => { if (!cut || !fr || !e.target.closest('.cut-row')) return; const hex = C.hex(C.color(C.sum(fr, cut[0], cut[1]), P)); C.copy(hex).then(() => C.toast('Copied ' + hex)) };
 /* ---------- history: songs / compare / birthdays, all card based ---------- */
-let paletteSong = null, paletteClose = null, htab = lsGet('colorseed.htab', 'songs'), mapMode = lsGet('colorseed.map', 'wheel'), songMode = lsGet('colorseed.songs', 'row'), analysisMode = lsGet('colorseed.analysis.mode', 'compare'), groupBy = lsGet('colorseed.group.by', 'hue'), groupSteps = +lsGet('colorseed.group.steps', '4'), halfMap = lsGet('colorseed.half', '0') === '1', selectMap = lsGet('colorseed.select', '0') === '1', compareMetric = lsGet('colorseed.metric', 'hsl'), hsel = 0, analysisPair = [0, 1], pair = [0, 1], msel = -1; const bdOff = new Set();
+let paletteSong = null, paletteClose = null, htab = lsGet('colorseed.htab', 'songs'), mapMode = lsGet('colorseed.map', 'wheel'), songMode = lsGet('colorseed.songs', 'row'), analysisMode = lsGet('colorseed.analysis.mode', 'compare'), groupBy = lsGet('colorseed.group.by', 'hue'), groupSteps = +lsGet('colorseed.group.steps', '4'), halfMap = lsGet('colorseed.half', '0') === '1', selectMap = lsGet('colorseed.select', '0') === '1', compareMetric = lsGet('colorseed.metric', 'hsl'), hslScope = lsGet('colorseed.hsl.scope', 'last8'), hsel = 0, analysisPair = [0, 1], pair = [0, 1], msel = -1; const bdOff = new Set();
 if (!/^[hsl]+$/.test(compareMetric) || !compareMetric) compareMetric = 'hsl';
 if (!['songs', 'map', 'analysis', 'groups', 'bday'].includes(htab)) htab = 'songs';
 const KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯', 'A♭', 'E♭', 'B♭', 'F'], rad = d => d * Math.PI / 180;
@@ -283,15 +283,16 @@ function pairCard(a, b, i, j) { const r = rel(a, b), A = r.A, B = r.B, ca = C.cs
   <div class="prow"><span>Saturation</span><div class="bars color-bars"><div>${thumb(a, A.c)}${bar(A.c.s, ca)}</div><div>${thumb(b, B.c)}${bar(B.c.s, cb)}</div></div></div>
   <div class="prow"><span>Brightness contrast</span><div class="bars color-bars"><div>${thumb(a, A.c)}${bar(A.c.l, ca)}</div><div>${thumb(b, B.c)}${bar(B.c.l, cb)}</div></div></div></div>` }
 function mapView(L, box) { const n = L.slice(0, 8); msel = hsel < n.length ? hsel : -1; pair = pair.map(i => Math.min(i, n.length - 1));
-  const actions = $('hist-actions'); actions.innerHTML = `<div class="compare-head-controls"><div class="seg"><button class="seg-btn${mapMode === 'wheel' ? ' on' : ''}" data-m="wheel">Wheel</button><button class="seg-btn${mapMode === 'bars' ? ' on' : ''}" data-m="bars">HSL</button></div><div class="seg"><button class="seg-btn${!selectMap ? ' on' : ''}" data-select="0">Triangle</button><button class="seg-btn${selectMap ? ' on' : ''}" data-select="1">Select</button></div><label class="head-toggle${selectMap ? ' disabled' : ''}" title="${selectMap ? 'Only available in Triangle mode' : 'Show only half of the comparison triangle'}"><span>Half</span><input type="checkbox" data-half${halfMap ? ' checked' : ''}${selectMap ? ' disabled' : ''}><i></i></label><button class="btn-reset" data-clear>Clear</button><button class="btn-reset" id="himport">Import</button><button class="btn-reset" id="hexport">Export</button><input type="file" id="hfile" accept="application/json,.json" hidden></div>`;
+  const actions = $('hist-actions'); actions.innerHTML = `<div class="compare-head-controls"><div class="seg"><button class="seg-btn${mapMode === 'wheel' ? ' on' : ''}" data-m="wheel">Wheel</button><button class="seg-btn${mapMode === 'bars' ? ' on' : ''}" data-m="bars">HSL</button></div><div class="seg"><button class="seg-btn${!selectMap ? ' on' : ''}" data-select="0">Triangle</button><button class="seg-btn${selectMap ? ' on' : ''}" data-select="1">Select</button></div>${mapMode === 'bars' ? `<div class="seg" aria-label="HSL songs shown"><button class="seg-btn${hslScope === 'all' ? ' on' : ''}" data-hsl-scope="all">All</button><button class="seg-btn${hslScope === 'last8' ? ' on' : ''}" data-hsl-scope="last8">Last 8</button></div>` : ''}<label class="head-toggle${selectMap ? ' disabled' : ''}" title="${selectMap ? 'Only available in Triangle mode' : 'Show only half of the comparison triangle'}"><span>Half</span><input type="checkbox" data-half${halfMap ? ' checked' : ''}${selectMap ? ' disabled' : ''}><i></i></label><button class="btn-reset" data-clear>Clear</button><button class="btn-reset" id="himport">Import</button><button class="btn-reset" id="hexport">Export</button><input type="file" id="hfile" accept="application/json,.json" hidden></div>`;
   actions.onclick = e => {
-    const b = e.target.closest('[data-m],[data-select],[data-half],[data-metric],[data-clear]');
+    const b = e.target.closest('[data-m],[data-select],[data-half],[data-hsl-scope],[data-metric],[data-clear]');
     if (!b) return;
     if (b.dataset.clear != null) {
       const clear = b; if (!C.hist().length) return;
       if (sure) { clearTimeout(sure); sure = 0; clear.textContent = 'Clear'; C.histSave([]); renderHist(); C.toast('History cleared'); return }
       clear.textContent = 'Sure?'; sure = setTimeout(() => { sure = 0; clear.textContent = 'Clear' }, 2500); return;
     }
+    if (b.dataset.hslScope) { hslScope = b.dataset.hslScope; lsSet('colorseed.hsl.scope', hslScope); renderHist(); return }
     if (b.dataset.m) { mapMode = b.dataset.m; lsSet('colorseed.map', mapMode) }
     else if (b.dataset.select) { selectMap = b.dataset.select === '1'; lsSet('colorseed.select', selectMap ? '1' : '0') }
     else if (b.dataset.metric) { compareMetric = b.dataset.metric === 'all' ? 'hsl' : b.dataset.metric; lsSet('colorseed.metric', compareMetric) }
@@ -304,7 +305,7 @@ function mapView(L, box) { const n = L.slice(0, 8); msel = hsel < n.length ? hse
   const scores = []; for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) scores.push(metricPct(n[i], n[j])); const lo = Math.min(...scores), hi = Math.max(...scores), norm = p => hi === lo ? 1 : (p - lo) / (hi - lo);
   const metric = `<div class="compare-metric" aria-label="Comparison channels"><span>Compare by</span><div class="seg"><button class="seg-btn${compareMetric === 'hsl' ? ' on' : ''}" data-metric="all">All</button><button class="seg-btn${compareMetric.includes('h') ? ' on' : ''}" data-metric="h">H</button><button class="seg-btn${compareMetric.includes('s') ? ' on' : ''}" data-metric="s">S</button><button class="seg-btn${compareMetric.includes('l') ? ' on' : ''}" data-metric="l">L</button></div></div>`;
   const mx = n.length < 2 ? '' : selectMap ? `<div class="select-pairs"><label>First song<select data-pick="0">${n.map((e, i) => `<option value="${i}"${pair[0] === i ? ' selected' : ''}>${esc(e.name)}</option>`).join('')}</select></label><label>Second song<select data-pick="1">${n.map((e, i) => `<option value="${i}"${pair[1] === i ? ' selected' : ''}>${esc(e.name)}</option>`).join('')}</select></label></div>` : `<div class="mx${halfMap ? ' half' : ''}" style="--n:${n.length}"><span></span>${n.map((e, i) => thumb(e, facts(e).c, '', i + 1)).join('')}${n.map((a, i) => thumb(a, facts(a).c, '', i + 1) + n.map((b, j) => i === j ? `<span class="mc self" style="--c:${C.css(facts(a).c)}"></span>` : (halfMap && j < i ? '<span class="mc blank"></span>' : `<button class="mc${pair[0] === i && pair[1] === j ? ' on' : ''}" data-p="${i},${j}" style="--k:${norm(metricPct(a, b)).toFixed(2)}" title="${esc(a.name)} vs ${esc(b.name)}">${metricPct(a, b)}</button>`)).join('')).join('')}</div>`;
-  const chart = mapMode === 'wheel' ? '<canvas id="mapcv" class="map-cv" width="360" height="360"></canvas>' : hslBars(n);
+  const chart = mapMode === 'wheel' ? '<canvas id="mapcv" class="map-cv" width="360" height="360"></canvas>' : hslBars(hslScope === 'all' ? L : n);
   box.innerHTML = seg + chart + metric + mx + (n.length > 1 && pair[0] !== pair[1] ? pairCard(n[pair[0]], n[pair[1]], pair[0], pair[1]) : empty('Load a second song to compare how alike two songs are.'));
   if (mapMode === 'wheel') drawMap($('mapcv'), n) }
 function bdayView(L, box) { const H = C.bdayHist(), e = L[hsel];
@@ -365,7 +366,10 @@ $('hist').onclick = e => { const q = s => e.target.closest(s), L = C.hist(); let
     if (a === 'calibrate') { calibrateSong(selected); return }
     if (a === 'card') { C.card(selected, P); return }
     L.splice(hsel, 1); C.histSave(L); hsel = 0 }
-  else if ((b = q('[data-p]'))) pair = b.dataset.p.split(',').map(Number);
+  else if ((b = q('[data-p]'))) {
+    const next = b.dataset.p.split(',').map(Number);
+    pair = pair[0] === next[0] && pair[1] === next[1] ? [0, 0] : next;
+  }
   else if ((b = q('[data-k]'))) bdOff.has(b.dataset.k) ? bdOff.delete(b.dataset.k) : bdOff.add(b.dataset.k);
   else if ((b = q('[data-i]'))) hsel = +b.dataset.i;
   else return; renderHist() };
