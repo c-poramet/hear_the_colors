@@ -71,14 +71,17 @@ addEventListener('keydown', e => {
   else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); setVol(vol + (e.key === 'ArrowUp' ? .05 : -.05), false); lsSet('colorseed.vol', vol) }
   else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && fr && au.duration) { e.preventDefault(); au.currentTime = C.cl(au.currentTime + (e.key === 'ArrowRight' ? 5 : -5), 0, au.duration) }
 });
-let hsl = lsGet('colorseed.viz', 'wheel') === 'hsl', mt = hsl ? 1 : 0; $('hslt').checked = hsl;
+let hsl = lsGet('colorseed.viz', 'hsl') === 'hsl', mt = hsl ? 1 : 0; $('hslt').checked = hsl;
 $('hslt').onchange = e => { hsl = e.target.checked; lsSet('colorseed.viz', hsl ? 'hsl' : 'wheel') };
+let showCut = lsGet('colorseed.cut', '0') === '1';
+function applyCut() { $('cutpanel').hidden = !showCut; $('cutt').checked = showCut; if (!showCut) { cut = null; loop = false; $('loop').checked = false } cutUI() }
+$('cutt').onchange = e => { showCut = e.target.checked; lsSet('colorseed.cut', showCut ? '1' : '0'); applyCut() };
 
 const fx = e => C.cl((e.clientX - st.getBoundingClientRect().left) / st.clientWidth, 0, 1);
 st.onpointerdown = e => { if (!fr) return; st.setPointerCapture(e.pointerId); drag = { x0: fx(e), moved: false } };
 st.onpointermove = e => { if (!drag) return; const x = fx(e); if (Math.abs(x - drag.x0) * st.clientWidth > 5) drag.moved = true;
-  if (drag.moved) { const a = Math.floor(Math.min(x, drag.x0) * fr.n); cut = [a, Math.min(fr.n, Math.max(a + 3, Math.floor(Math.max(x, drag.x0) * fr.n)))]; cutUI() } };
-st.onpointerup = () => { if (drag && !drag.moved && au.duration) au.currentTime = drag.x0 * au.duration; drag = null };
+  if (drag.moved && showCut) { const a = Math.floor(Math.min(x, drag.x0) * fr.n); cut = [a, Math.min(fr.n, Math.max(a + 3, Math.floor(Math.max(x, drag.x0) * fr.n)))]; cutUI() } };
+st.onpointerup = e => { if (drag && (!drag.moved || !showCut) && au.duration) au.currentTime = (drag.moved ? fx(e) : drag.x0) * au.duration; drag = null };
 $('cclr').onclick = () => { cut = null; cutUI() };
 $('loop').onchange = e => loop = e.target.checked;
 
@@ -93,20 +96,67 @@ function cutUI() {
   <div class="stat-chip"><span class="stat-val">${sg((s.l - w.l) * 100)}%</span><span class="stat-lbl">lightness</span></div></div>`;
 }
 $('cutbox').onclick = e => { if (!cut || !fr || !e.target.closest('.cut-row')) return; const hex = C.hex(C.color(C.sum(fr, cut[0], cut[1]), P)); C.copy(hex).then(() => C.toast('Copied ' + hex)) };
-function renderHist() {
-  const L = C.hist(), box = $('hist');
-  box.innerHTML = L.length ? L.map((e, i) => { const c = C.color(e.raw, P), hex = C.hex(c);
-    return `<div class="hist-item" data-i="${i}" title="Click to copy ${hex}">${e.art ? `<img class="hist-art" src="${esc(e.art)}" alt="">` : ''}<canvas class="hist-glyph" width="104" height="104" data-i="${i}" title="Open share card" aria-label="Open share card for ${esc(e.name)}"></canvas><div class="hist-meta"><div class="hist-name">${esc(e.name)}</div><div class="hist-fp">${e.fp} · ${fmt(e.dur)}</div><div class="hist-col"><i style="background:${C.css(c)}"></i><span class="hist-hex">${hex}</span></div></div><button class="btn-reset" data-d="${i}" aria-label="Remove ${esc(e.name)}">✕</button></div>` }).join('')
-    : '<div class="placeholder-state"><div class="placeholder-text">Songs you play leave a glyph here: a fuzzy fingerprint ring and their colour. Click a row to copy its colour, or the glyph to open a share card.</div></div>';
-  box.querySelectorAll('canvas').forEach(cv => { const e = L[cv.dataset.i]; C.glyph(cv, e, C.css(C.color(e.raw, P))) });
-}
-$('hist').onclick = e => {
-  const d = e.target.dataset.d; if (d != null) { const L = C.hist(); L.splice(d, 1); C.histSave(L); renderHist(); return }
-  const it = e.target.closest('.hist-item'), x = it && C.hist()[it.dataset.i]; if (!x) return;
-  if (e.target.closest('canvas')) { C.card(x, P); return }
-  const hex = C.hex(C.color(x.raw, P)), lbl = it.querySelector('.hist-hex');
-  C.copy(hex).then(() => { lbl.textContent = 'Copied ✓'; setTimeout(() => lbl.textContent = hex, 1000) });
-};
+/* ---------- history: songs / compare / birthdays, all card based ---------- */
+let htab = lsGet('colorseed.htab', 'songs'), mapMode = lsGet('colorseed.map', 'wheel'), hsel = 0, pair = [0, 1], msel = -1; const bdOff = new Set();
+if (!['songs', 'map', 'bday'].includes(htab)) htab = 'songs';
+const KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯', 'A♭', 'E♭', 'B♭', 'F'], rad = d => d * Math.PI / 180;
+// hue = place on the circle of fifths (key area), saturation = rhythmic density, lightness = timbre brightness
+const facts = e => { const c = C.color(e.raw, P), a = (c.a + 360) % 360; return { c, a, r: e.raw.s0, rate: -5 * Math.log(1 - Math.min(.999, e.raw.s0)), key: KEYS[Math.round(a / 30) % 12] } };
+const rel = (x, y) => { const A = facts(x), B = facts(y), d = Math.abs(A.a - B.a), st = Math.min(d, 360 - d) / 30;
+  return { A, B, st, pct: Math.round(100 * (1 - (.5 * st / 6 + .25 * Math.abs(A.c.s - B.c.s) + .25 * Math.abs(A.c.l - B.c.l)))) } };
+const gl = {}, glyphURL = (e, col) => { const k = e.fp + col; if (!gl[k]) { const t = document.createElement('canvas'); t.width = t.height = 120; C.glyph(t, e, col); gl[k] = t.toDataURL() } return gl[k] };
+const hx = c => `<span class="hx"><i style="background:${C.css(c)}"></i>${C.hex(c)}</span>`;
+const thumb = (e, c, cls = '', n) => `<span class="th ${cls}" style="--c:${C.css(c)}"><img ${e.art ? '' : 'class="gl" '}src="${e.art ? esc(e.art) : glyphURL(e, C.css(c))}" alt="">${n ? `<b class="nb">${n}</b>` : ''}</span>`;
+const dial = (a, col, key) => `<svg class="dial" viewBox="-22 -22 44 44"><circle r="17" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="2"/><circle cx="${(17 * Math.sin(rad(a))).toFixed(1)}" cy="${(-17 * Math.cos(rad(a))).toFixed(1)}" r="4.5" fill="${col}" stroke="#fff" stroke-width="1.5"/>${key ? `<text y="4.5" text-anchor="middle" font-size="12" font-weight="700" font-family="Space Mono,monospace" fill="#f0f0f0">${key}</text>` : ''}</svg>`;
+const bar = (v, col) => `<span class="bar"><i style="width:${Math.round(C.cl(v, 0, 1) * 100)}%;background:${col}"></i></span>`;
+const empty = t => `<div class="placeholder-state"><div class="placeholder-text">${t}</div></div>`;
+
+function songCard(e) { const f = facts(e), css = C.css(f.c);
+  return `<div class="scard" style="--c:${css}">${thumb(e, f.c, 'lg')}<div class="sc-body"><div class="sc-name">${esc(e.name)}</div><div class="sc-sub">${fmt(e.dur)} · ${e.fp}</div>${hx(f.c)}</div>
+  <div class="sc-meters"><div class="mt">${dial(f.a, css, f.key)}<span>Key</span></div><div class="mt">${bar(f.r, css)}<span>Rhythm ${f.rate.toFixed(1)}/s</span></div><div class="mt">${bar(f.c.l, css)}<span>Brightness</span></div></div>
+  <div class="sc-act"><button class="btn-reset" data-a="copy">Copy hex</button><button class="btn-reset" data-a="card">Share card</button><button class="btn-reset" data-a="del">Remove</button></div></div>` }
+function songsView(L, box) { box.innerHTML = songCard(L[hsel]) + '<div class="gcards">' + L.map((e, i) => { const c = facts(e).c; return `<button class="gcard${i === hsel ? ' on' : ''}" data-i="${i}">${thumb(e, c)}<span class="gn">${esc(e.name)}</span>${hx(c)}</button>` }).join('') + '</div>' }
+
+function drawMap(cv, L) { const g = cv.getContext('2d'), S = cv.width;
+  if (mapMode === 'wheel') return C.wheel(cv, L.map((e, i) => { const c = C.color(e.raw, P); return { h: c.h, s: c.s, color: C.css(c), label: i + 1, sel: i === msel } }));
+  const Hh = cv.height, rh = (Hh - 16) / 3, bw = Math.min(30, (S - 60) / L.length / 1.15); g.clearRect(0, 0, S, Hh); g.font = '700 12px "Space Mono",monospace';
+  [['HUE', c => c.h / 360], ['SAT', c => c.s], ['LIGHT', c => c.l]].forEach(([lab, f], r) => { g.fillStyle = 'rgba(255,255,255,.38)'; g.fillText(lab, 2, r * rh + rh / 2); g.fillStyle = 'rgba(255,255,255,.07)'; g.fillRect(40, (r + 1) * rh - 4, S - 44, 1);
+    L.forEach((e, i) => { const c = C.color(e.raw, P), h = Math.max(3, f(c) * (rh - 14)); g.fillStyle = C.css(c); C.rr(g, 40 + i * bw * 1.15, (r + 1) * rh - 4 - h, bw, h, 3); g.fill() }) });
+  g.fillStyle = 'rgba(255,255,255,.38)'; L.forEach((e, i) => g.fillText(i + 1, 40 + i * bw * 1.15 + bw / 2 - 3, Hh - 2)) }
+function pairCard(a, b, i, j) { const r = rel(a, b), A = r.A, B = r.B, ca = C.css(A.c), cb = C.css(B.c);
+  return `<div class="pair"><div class="ph">${thumb(a, A.c, '', i + 1)}<div class="pp"><b>${r.pct}%</b><span>alike</span></div>${thumb(b, B.c, '', j + 1)}</div>
+  <div class="prow"><span>Key</span><div class="pd">${dial(A.a, ca, A.key)}<em>${r.st < .5 ? 'same key area' : Math.round(r.st) + (Math.round(r.st) === 1 ? ' fifth apart' : ' fifths apart')}</em>${dial(B.a, cb, B.key)}</div></div>
+  <div class="prow"><span>Rhythm</span><div class="bars">${bar(A.r, ca)}${bar(B.r, cb)}</div></div><div class="prow"><span>Bright</span><div class="bars">${bar(A.c.l, ca)}${bar(B.c.l, cb)}</div></div></div>` }
+function mapView(L, box) { const n = L.slice(0, 8); msel = hsel < n.length ? hsel : -1; pair = pair.map(i => Math.min(i, n.length - 1));
+  const seg = `<div class="seg wide"><button class="seg-btn${mapMode === 'wheel' ? ' on' : ''}" data-m="wheel">Wheel</button><button class="seg-btn${mapMode === 'bars' ? ' on' : ''}" data-m="bars">HSL bars</button></div>`;
+  const mx = n.length < 2 ? '' : `<div class="mx" style="--n:${n.length}"><span></span>${n.map((e, i) => thumb(e, facts(e).c, '', i + 1)).join('')}${n.map((a, i) => thumb(a, facts(a).c, '', i + 1) + n.map((b, j) => i === j ? `<span class="mc self" style="--c:${C.css(facts(a).c)}"></span>` : `<button class="mc${pair[0] === i && pair[1] === j ? ' on' : ''}" data-p="${i},${j}" style="--k:${C.cl((rel(a, b).pct - 60) / 40, 0, 1).toFixed(2)}" title="${esc(a.name)} vs ${esc(b.name)}">${rel(a, b).pct}</button>`).join('')).join('')}</div>`;
+  box.innerHTML = seg + `<canvas id="mapcv" class="map-cv" width="360" height="${mapMode === 'wheel' ? 360 : 280}"></canvas>` + mx + (n.length > 1 && pair[0] !== pair[1] ? pairCard(n[pair[0]], n[pair[1]], pair[0], pair[1]) : empty('Load a second song to compare how alike two songs are.'));
+  drawMap($('mapcv'), n) }
+function bdayView(L, box) { const H = C.bdayHist(), e = L[hsel];
+  if (!H.length) return box.innerHTML = empty('Save birthdays with the BIRTHDAY tag in the header, then compare one song\'s colour across them here.');
+  const R = [{ k: 'cur', d: '', label: 'Current seed', p: P }, ...H.map(h => ({ k: h.d, d: h.d, label: h.label, p: C.fromDate(h.d) }))].map(r => ({ ...r, c: C.color(e.raw, r.p) })), on = R.filter(r => !bdOff.has(r.k));
+  box.innerHTML = `<div class="sstrip">${L.slice(0, 10).map((x, i) => `<button class="sbtn${i === hsel ? ' on' : ''}" data-i="${i}" title="${esc(x.name)}">${thumb(x, facts(x).c)}</button>`).join('')}</div>
+  <div class="sc-name">${esc(e.name)}</div><div class="stripe">${on.map(r => `<i style="background:${C.css(r.c)}"></i>`).join('')}</div><canvas id="bdcv" class="map-cv sm" width="360" height="360"></canvas>
+  <p class="hint">Click a card to show or hide it in the wheel and the strip.</p>
+  <div class="bgrid">${R.map((r, i) => `<div class="bcard${bdOff.has(r.k) ? ' off' : ''}${r.k === 'cur' ? ' cur' : ''}" data-k="${r.k}" role="button" tabindex="0" aria-pressed="${!bdOff.has(r.k)}" style="--c:${C.css(r.c)}"><div class="sw">${thumb(e, r.c, '', i + 1)}</div><div class="bb"><div class="bn">${esc(r.label || C.fmtD(r.d))}</div>${r.d && r.label ? `<div class="bs">${C.fmtD(r.d)}</div>` : ''}${hx(r.c)}${r.d ? `<button class="btn-reset" data-u="${r.d}">Use</button>` : '<span class="chip">In use</span>'}</div></div>`).join('')}</div>`;
+  C.wheel($('bdcv'), R.map((r, i) => bdOff.has(r.k) ? null : { h: r.c.h, s: r.c.s, color: C.css(r.c), label: i + 1 }).filter(Boolean)) }
+function renderHist() { const L = C.hist(), box = $('hist'); hsel = Math.min(hsel, Math.max(0, L.length - 1));
+  document.querySelectorAll('#htabs [data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === htab));
+  if (!L.length) { box.innerHTML = empty('Songs you play collect here as cards: cover, colour, key, rhythm and brightness at a glance. Compare them and try them under your birthdays.'); return }
+  (htab === 'map' ? mapView : htab === 'bday' ? bdayView : songsView)(L, box) }
+$('htabs').onclick = e => { const t = e.target.closest('[data-t]'); if (t) { htab = t.dataset.t; lsSet('colorseed.htab', htab); renderHist() } };
+$('hist').onclick = e => { const q = s => e.target.closest(s), L = C.hist(); let b;
+  if ((b = q('[data-u]'))) { const u = b.dataset.u, p = C.bdayUse(u); C.save(p); C.onSeed(p); C.toast('Using ' + C.fmtD(u)); return }
+  if ((b = q('[data-m]'))) { mapMode = b.dataset.m; lsSet('colorseed.map', mapMode) }
+  else if ((b = q('[data-a]'))) { const x = L[hsel], a = b.dataset.a; if (!x) return;
+    if (a === 'copy') { const hex = C.hex(C.color(x.raw, P)); C.copy(hex).then(() => C.toast('Copied ' + hex)); return }
+    if (a === 'card') { C.card(x, P); return }
+    L.splice(hsel, 1); C.histSave(L); hsel = 0 }
+  else if ((b = q('[data-p]'))) pair = b.dataset.p.split(',').map(Number);
+  else if ((b = q('[data-k]'))) bdOff.has(b.dataset.k) ? bdOff.delete(b.dataset.k) : bdOff.add(b.dataset.k);
+  else if ((b = q('[data-i]'))) hsel = +b.dataset.i;
+  else return; renderHist() };
+$('hist').onkeydown = e => { const b = e.target.closest('[data-k]'); if (b && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); b.click() } };
 let sure = 0;
 $('hclr').onclick = () => { const b = $('hclr'); if (!C.hist().length) return;
   if (sure) { clearTimeout(sure); sure = 0; b.textContent = 'Clear'; C.histSave([]); renderHist(); C.toast('History cleared'); return }
@@ -185,4 +235,4 @@ function frame(t) {
   trail.push([cs.h, cs.s]); C.wheel(wc, fr ? [{ h: cs.h, s: cs.s, color: C.css(cs), trail }] : []);
   $('stage').style.setProperty('--c', C.css(cs)); drawViz(t, !!fr);
 }
-cutUI(); renderHist(); requestAnimationFrame(frame);
+applyCut(); renderHist(); requestAnimationFrame(frame);

@@ -18,7 +18,10 @@
   <section class="panel"><div class="panel-title">Knobs</div><div id="knobs"></div></section>
   <section class="panel"><div class="panel-title">Seed from date of birth</div>
     <div class="btn-row"><input type="text" id="dob" class="field" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" autocomplete="bday"><button id="gen" class="btn-reset">Generate</button></div>
-    <p class="hint" id="dobmsg">Same date, same seed. Neighbouring dates land as far apart as possible.</p></section>
+    <div class="toggle-row"><span class="toggle-label">Include year</span><label class="toggle-switch"><input type="checkbox" id="yr" aria-label="Include year in the calculation"><span class="toggle-track"></span></label></div>
+    <p class="hint" id="dobmsg">Same day, same seed. With the year ignored, all 366 calendar days land as far apart as possible.</p></section>
+  <section class="panel"><div class="panel-title">Dates for this seed</div><div class="btn-row"><button id="find" class="btn-analyze">Find dates</button></div>
+    <p class="hint" id="foundmsg">Lists the dates whose seed gives the closest colours to the current knobs.</p><ul id="found"></ul></section>
   <section class="panel"><div class="panel-title">Share</div>
     <div class="btn-row"><input id="code" class="field" readonly><button id="copy" class="btn-reset">Copy link</button></div>
     <canvas id="qr" title="Scan to open with this seed"></canvas>

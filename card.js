@@ -10,8 +10,9 @@ const wrap = (g, text, w, max) => { const words = text.split(/\s+/), out = []; l
 
 /* ---------- what can be shown on the card ---------- */
 const OPT = [['brand', 'Brand & footer'], ['seed', 'Seed code'], ['cover', 'Cover art'], ['title', 'Title'], ['color', 'Colour'], ['length', 'Length'], ['fp', 'Fingerprint'], ['stats', 'Stats']];
+const FPT = [['ring', 'Ring'], ['bars', 'HSL bars'], ['wheel', 'Wheel path']];
 const CONTENT = ['cover', 'title', 'color', 'length', 'fp', 'stats'], CK = 'colorseed.card.v1';
-const getOpts = () => { let o = {}; try { o = JSON.parse(localStorage.getItem(CK)) || {} } catch (e) {} const r = {}; OPT.forEach(([k]) => r[k] = o[k] !== false); return r };
+const getOpts = () => { let o = {}; try { o = JSON.parse(localStorage.getItem(CK)) || {} } catch (e) {} const r = {}; OPT.forEach(([k]) => r[k] = o[k] !== false); r.fpt = FPT.some(f => f[0] === o.fpt) ? o.fpt : 'ring'; return r };
 const putOpts = o => { try { localStorage.setItem(CK, JSON.stringify(o)) } catch (e) {} };
 
 /* The card is drawn as one of the app's panels (style guide §5) on the page background, at ~2x CSS scale:
@@ -66,7 +67,28 @@ C.cardRender = async (e, P, o = getOpts()) => {
 
   // fingerprint block
   let fp = null;
-  if (o.fp) { const D = onlyFp ? 640 : 480, capH = 36 + 22 + 16 + 40;
+  const fpCap = (g, cx, y, off) => { T(g, 'FINGERPRINT', cx, y + off + 50, '700 20px ' + MONO, 'rgba(255,255,255,.38)', 'center', 4); T(g, e.fp.match(/.{4}/g).join('  '), cx, y + off + 98, '700 38px ' + MONO, '#f0f0f0', 'center', 2) };
+  const fpTraj = (ft, TR, big) => { const last = TR[TR.length - 1], cap = 114;
+    if (ft === 'wheel') { const D = big ? 640 : 460; return { h: D + cap, draw: (g, y) => { const cx = X0 + CW / 2, cy = y + D / 2, ox = cx - D / 2, oy = cy - D / 2, R = D / 2 - 16, tmp = document.createElement('canvas'); tmp.width = tmp.height = D; C.wheel(tmp, []);
+      const pt = k => [ox + D / 2 + R * k.s * Math.sin(k.h * Math.PI / 180), oy + D / 2 - R * k.s * Math.cos(k.h * Math.PI / 180)];
+      g.save(); g.globalAlpha = .5; g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.clip(); g.drawImage(tmp, ox, oy); g.restore();
+      g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.14)'; g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.stroke();
+      g.lineCap = 'round'; g.lineWidth = 7; TR.forEach((k, i) => { if (!i) return; const [a, b] = pt(TR[i - 1]), [c2, d] = pt(k); g.strokeStyle = C.css(k); g.beginPath(); g.moveTo(a, b); g.lineTo(c2, d); g.stroke() });
+      const [sx, sy] = pt(TR[0]), [ex, ey] = pt(last); g.lineWidth = 4; g.strokeStyle = '#f0f0f0'; g.beginPath(); g.arc(sx, sy, 9, 0, TAU); g.stroke(); g.fillStyle = C.css(last); g.beginPath(); g.arc(ex, ey, 14, 0, TAU); g.fill(); g.stroke(); fpCap(g, cx, y, D) } } }
+    const rows = [['HUE', k => k.h / 360, k => k.h.toFixed(0) + '°', () => [0, 60, 120, 180, 240, 300, 360].map(h => [h / 360, `hsl(${h} ${last.s * 100}% ${last.l * 100}%)`])],
+      ['SAT', k => k.s, k => (k.s * 100).toFixed(0) + '%', () => [[0, `hsl(${last.h} 0% ${last.l * 100}%)`], [1, `hsl(${last.h} 100% ${last.l * 100}%)`]]],
+      ['LIGHT', k => k.l, k => (k.l * 100).toFixed(0) + '%', () => [[0, '#000'], [.5, `hsl(${last.h} ${last.s * 100}% 50%)`], [1, '#fff']]]], RH = 104;
+    return { h: RH * 3 + cap, draw: (g, y) => { const tx = X0 + 150, tw = CW - 150 - 170;
+      rows.forEach(([lab, f, fv, st], r) => { const yy = y + r * RH + 62; T(g, lab, X0, yy + 8, '700 24px ' + MONO, 'rgba(255,255,255,.38)');
+        const gr = g.createLinearGradient(tx, 0, tx + tw, 0); st().forEach(([o2, col]) => gr.addColorStop(o2, col)); g.fillStyle = gr; C.rr(g, tx, yy - 9, tw, 18, 9); g.fill(); g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.14)'; g.stroke();
+        const px = i => tx + tw * f(TR[i]), py = i => yy - 8 - 44 * (1 - i / (TR.length - 1)); // time runs from the top of the lane down to the bar
+        g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.3)'; g.beginPath(); TR.forEach((k, i) => i ? g.lineTo(px(i), py(i)) : g.moveTo(px(i), py(i))); g.stroke();
+        TR.forEach((k, i) => { g.globalAlpha = .35 + .65 * i / TR.length; g.fillStyle = C.css(k); g.beginPath(); g.arc(px(i), py(i), 5, 0, TAU); g.fill() }); g.globalAlpha = 1;
+        g.fillStyle = C.css(last); g.lineWidth = 4; g.strokeStyle = '#fff'; g.beginPath(); g.arc(px(TR.length - 1), yy, 14, 0, TAU); g.fill(); g.stroke();
+        T(g, fv(last), X0 + CW, yy + 12, '700 34px ' + MONO, '#f0f0f0', 'right') });
+      fpCap(g, X0 + CW / 2, y, RH * 3 - 20) } } };
+  const TR = C.trajColors(e, P), ft = TR.length > 1 ? o.fpt : 'ring';
+  if (o.fp && ft !== 'ring') fp = fpTraj(ft, TR, onlyFp); else if (o.fp) { const D = onlyFp ? 640 : 480, capH = 36 + 22 + 16 + 40;
     fp = { h: D + capH, draw: (g, y) => { const cx = X0 + CW / 2, cy = y + D / 2;
       const disc = g.createRadialGradient(cx, cy, 0, cx, cy, D / 2); disc.addColorStop(0, 'rgba(0,0,0,.45)'); disc.addColorStop(1, 'rgba(0,0,0,.25)');
       g.fillStyle = disc; g.beginPath(); g.arc(cx, cy, D / 2, 0, TAU); g.fill(); g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.11)'; g.stroke();
@@ -110,23 +132,26 @@ C.card = async (e, P) => {
   const prev = document.activeElement; let o = getOpts(), tick = 0, cv = null;
   document.getElementById('modal')?.remove();
   const m = document.createElement('div'); m.id = 'modal'; m.className = 'modal'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', 'Share card');
-  m.innerHTML = `<div class="modal-box card-box"><div class="frame"></div><section class="panel card-side"><div class="panel-title">Show on card</div>
-    ${OPT.map(([k, l]) => `<div class="toggle-row"><span class="toggle-label">${l}</span><label class="toggle-switch"><input type="checkbox" data-k="${k}" aria-label="${l}"${o[k] ? ' checked' : ''}><span class="toggle-track"></span></label></div>`).join('')}
+  const GR = [['Header', ['brand', 'seed']], ['Song', ['cover', 'title', 'color', 'length']], ['Visuals', ['fp', 'stats']]], LB = Object.fromEntries(OPT);
+  const row = k => `<div class="toggle-row"><span class="toggle-label">${LB[k]}</span><label class="toggle-switch"><input type="checkbox" data-k="${k}" aria-label="${LB[k]}"${o[k] ? ' checked' : ''}><span class="toggle-track"></span></label></div>`;
+  m.innerHTML = `<div class="modal-box card-box"><div class="frame"></div><section class="panel card-side"><div class="panel-title">Share card<button class="btn-reset" data-a="x" aria-label="Close">✕</button></div>
+    ${GR.map(([t, ks]) => `<div class="opt-group"><div class="opt-title">${t}</div>${ks.map(row).join('')}${t === 'Visuals' ? `<div class="seg" role="group" aria-label="Fingerprint style">${FPT.map(([k, l]) => `<button class="seg-btn" data-f="${k}">${l}</button>`).join('')}</div>` : ''}</div>`).join('')}
     <div class="btn-row presets"><button class="btn-reset" data-p="all">All</button><button class="btn-reset" data-p="min">Minimal</button></div>
-    <div class="btn-row"><button class="btn-analyze" data-a="dl">Download PNG</button><button class="btn-reset" data-a="share" hidden>Share</button><button class="btn-reset" data-a="x">Close</button></div></section></div>`;
+    <div class="btn-row"><button class="btn-analyze" data-a="dl">Download PNG</button><button class="btn-reset" data-a="share" hidden>Share</button></div></section></div>`;
   document.body.appendChild(m);
   const slug = e.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'song', file = () => new Promise(r => cv.toBlob(r, 'image/png')), fname = 'colorseed-' + slug + '.png';
-  const frame = m.querySelector('.frame'), sync = () => m.querySelectorAll('[data-k]').forEach(i => i.checked = !!o[i.dataset.k]);
+  const frame = m.querySelector('.frame'), sync = () => { m.querySelectorAll('[data-k]').forEach(i => i.checked = !!o[i.dataset.k]); m.querySelectorAll('[data-f]').forEach(b => { const ok = b.dataset.f === 'ring' || (e.T && e.T.length > 1); b.classList.toggle('on', b.dataset.f === (ok ? o.fpt : 'ring') || (!ok && b.dataset.f === 'ring')); b.disabled = !o.fp || !ok; b.title = ok ? '' : 'Load this song again to record its movement' }) };
   const refresh = async () => { const my = ++tick, c = await C.cardRender(e, P, o); if (my !== tick) return; c.className = 'card-preview'; frame.replaceChildren(c); cv = c };
   const set = n => { if (!CONTENT.some(k => n[k])) { C.toast('Keep at least one item on the card'); sync(); return } o = n; putOpts(o); sync(); refresh() };
   const shut = () => { m.remove(); removeEventListener('keydown', key, true); prev && prev.focus && prev.focus() };
   const key = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); shut() } };
   addEventListener('keydown', key, true);
-  await refresh();
+  sync(); await refresh();
   file().then(b => { if (navigator.canShare && navigator.canShare({ files: [new File([b], fname, { type: 'image/png' })] })) m.querySelector('[data-a=share]').hidden = false });
   m.onchange = ev => { const k = ev.target.dataset.k; if (k) set({ ...o, [k]: ev.target.checked }) };
   m.onclick = async ev => { if (ev.target === m) return shut();
-    const p = ev.target.closest('[data-p]'); if (p) { const all = {}; OPT.forEach(([k]) => all[k] = true); return set(p.dataset.p === 'all' ? all : { brand: false, seed: false, cover: true, title: true, color: true, length: false, fp: false, stats: false }) }
+    const p = ev.target.closest('[data-p]'); if (p) { const all = { ...o }; OPT.forEach(([k]) => all[k] = true); return set(p.dataset.p === 'all' ? all : { ...o, brand: false, seed: false, cover: true, title: true, color: true, length: false, fp: false, stats: false }) }
+    const f = ev.target.closest('[data-f]'); if (f) return f.disabled ? 0 : set({ ...o, fpt: f.dataset.f });
     const a = ev.target.closest('[data-a]'); if (!a) return;
     if (a.dataset.a === 'x') shut();
     else if (a.dataset.a === 'dl') { const b = await file(), l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = fname; l.click(); setTimeout(() => URL.revokeObjectURL(l.href), 1000); C.toast('Card saved') }

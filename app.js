@@ -18,16 +18,19 @@ function draw() {
     items.push({ h: c.h, s: c.s, color: C.css(c), label: i + 1, sel: i === sel });
     if (s.target) { const t = C.fromHex(s.target); items.push({ h: t.h, s: t.s, color: s.target, hollow: 1, label: i + 1, sel: i === sel }) } });
   C.wheel($('wheel'), items);
-  $('list').innerHTML = songs.map((s, i) => `<li class="${i === sel ? 'sel' : ''}" data-i="${i}"><i style="background:${C.css(s.c)}"></i><span>${i + 1}. ${s.name}</span>
-    <input type="color" value="${s.target || C.hex(s.c)}" data-t="${i}" title="target colour"><button class="btn-reset" data-x="${i}" title="clear target">✕</button></li>`).join('');
+  $('list').innerHTML = songs.map((s, i) => `<li class="${i === sel ? 'sel' : ''}" data-i="${i}"><div class="lr"><i style="background:${C.css(s.c)}"></i><span>${i + 1}. ${s.name}</span><button class="btn-reset" data-x="${i}" title="clear target" aria-label="Clear target">✕</button></div>
+    <div class="lr"><span class="hx" title="where the song lands now"><i style="background:${C.css(s.c)}"></i>${C.hex(s.c)}</span><span class="arrow">→</span><span class="hx tgt"><i style="background:${s.target || 'transparent'}"></i><input class="hexin" data-h="${i}" value="${s.target || ''}" placeholder="#rrggbb" maxlength="7" spellcheck="false" aria-label="Target hex for song ${i + 1}"></span><input type="color" value="${s.target || C.hex(s.c)}" data-t="${i}" title="pick target colour"></div></li>`).join('');
   const code = C.enc(P), url = location.href.split('#')[0].replace(/[^/]*$/, 'index.html') + '#c=' + code;
   $('code').value = url; C.seedTag(P);
   $('qr').style.display = C.qr($('qr'), url) ? '' : 'none';
 }
 
-$('list').onclick = e => { const x = e.target.dataset.x; if (x != null) songs[x].target = null; else if (!e.target.dataset.t) { const li = e.target.closest('li'); if (!li) return; sel = +li.dataset.i } draw() };
+$('list').onclick = e => { const x = e.target.dataset.x; if (x != null) songs[x].target = null; else if (!e.target.dataset.t && e.target.dataset.h == null) { const li = e.target.closest('li'); if (!li) return; sel = +li.dataset.i } draw() };
 $('list').oninput = e => { const t = e.target.dataset.t; if (t != null) { songs[t].target = e.target.value; sel = +t; $('list').querySelectorAll('li')[t].querySelector('i') } };
-$('list').onchange = e => { if (e.target.dataset.t != null) draw() };
+$('list').onchange = e => { const el = e.target;
+  if (el.dataset.h != null) { const i = +el.dataset.h, v = el.value.trim().replace(/^#?/, ''), m = v.match(/^([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (!v) songs[i].target = null; else if (m) { songs[i].target = '#' + (v.length === 3 ? [...v].map(x => x + x).join('') : v).toLowerCase(); sel = i } else C.toast('Enter a hex colour like #c97f50');
+    draw() } else if (el.dataset.t != null) draw() };
 
 const cv = $('wheel'); let down = false;
 const pick = e => { if (sel < 0 || !songs[sel]) return; const p = C.wheelPos(cv, e), s = songs[sel];
@@ -64,7 +67,7 @@ $('dob').oninput = e => { const v = e.target.value.replace(/\D/g, '').slice(0, 8
   e.target.value = [v.slice(0, 2), v.slice(2, 4), v.slice(4)].filter(Boolean).join('/') };
 $('dob').onkeydown = e => { if (e.key === 'Enter') $('gen').click() };
 $('gen').onclick = () => { const iso = C.parseDMY($('dob').value);
-  if (!iso) { $('dobmsg').textContent = 'Enter a real date as dd/mm/yyyy.'; return }
+  if (!iso) { $('dobmsg').textContent = C.yearMode() ? 'Enter a real date as dd/mm/yyyy.' : 'Enter a real day as dd/mm.'; return }
   $('dobmsg').textContent = DOBHINT; P = C.bdayUse(iso); commit(); C.toast('Seed from ' + $('dob').value) };
 C.onSeed = p => { P = p; commit() };
 $('copy').onclick = () => C.copy($('code').value).then(() => C.toast('Link copied'));
@@ -72,4 +75,11 @@ $('dl').onclick = () => $('qr').toBlob(b => { const a = document.createElement('
 $('apply').onclick = () => { const m = $('imp').value.match(/c=([\d.]+)/), p = C.dec(m ? m[1] : $('imp').value);
   if (p) { P = p; commit(); $('imp').value = '' } else $('imp').placeholder = 'Invalid code' };
 $('qr').title = 'Scan to open with this seed';
+const FIND = $('foundmsg').textContent, setDob = () => $('dob').placeholder = C.yearMode() ? 'dd/mm/yyyy' : 'dd/mm (year ignored)';
+$('yr').checked = C.yearMode(); setDob();
+$('yr').onchange = e => { C.setYearMode(e.target.checked); setDob(); $('found').innerHTML = ''; $('foundmsg').textContent = FIND; draw() };
+$('find').onclick = () => { $('foundmsg').textContent = 'Searching…'; $('found').innerHTML = '';
+  C.nearDates(P, C.yearMode(), L => { $('foundmsg').textContent = L[0].pct >= 99 ? 'Exact match first, then the next closest.' : 'No exact date. Closest first:';
+    $('found').innerHTML = L.map(x => `<li><i style="background:${C.hex(C.color({ hx: 1, hy: 0, s0: .5, l0: .5 }, C.fromDate(x.d)))}"></i><span>${C.fmtD(x.d)}</span><span>${x.pct}%</span><button class="btn-reset" data-d="${x.d}">Use</button></li>`).join('') }) };
+$('found').onclick = e => { const d = e.target.dataset.d; if (d) { P = C.bdayUse(d); commit(); C.toast('Using ' + C.fmtD(d)) } };
 draw();

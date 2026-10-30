@@ -19,7 +19,7 @@
       <div class="now-col"><i id="ncol"></i><span class="mono" id="nhex">–</span></div></div></div>
   <div class="viz-wrap"><div class="viz-box">
     <canvas id="viz" width="800" height="560" role="img" aria-label="Live audio spectrum with the running colour"></canvas>
-    <div class="viz-toggle"><span>HSL bars</span><label class="toggle-switch"><input type="checkbox" id="hslt" aria-label="Show HSL bars instead of the colour wheel"><span class="toggle-track"></span></label></div>
+    <div class="viz-toggle"><span>HSL bars</span><label class="toggle-switch"><input type="checkbox" id="hslt" aria-label="Show HSL bars instead of the colour wheel"><span class="toggle-track"></span></label><span>Cut</span><label class="toggle-switch"><input type="checkbox" id="cutt" aria-label="Show the cut panel"><span class="toggle-track"></span></label></div>
     <div class="viz-empty" id="empty">Drop an audio file here, or press Load audio</div>
   </div></div>
   <div class="stats-bar compact">
@@ -38,13 +38,13 @@
   <audio id="au" hidden></audio>
   <canvas id="strip" width="800" height="56" aria-label="Timeline: click to seek, drag to cut a piece"></canvas>
   <div class="progress" id="progw"><i id="prog"></i></div>
-  <p class="hint" id="status">Click the timeline to seek, drag to cut a piece. Space plays, ← → seek, ↑ ↓ volume, M mutes.</p>
+  <p class="hint" id="status">Click the timeline to seek. Turn on Cut to drag out a piece. Space plays, ← → seek, ↑ ↓ volume, M mutes.</p>
 </section>
 <div class="right-panel">
-  <section class="panel"><div class="panel-title">Cut <button class="btn-reset" id="cclr">Clear</button></div>
+  <section class="panel" id="cutpanel" hidden><div class="panel-title">Cut <button class="btn-reset" id="cclr">Clear</button></div>
     <div id="cutbox"></div>
     <div class="toggle-row"><span class="toggle-label">Loop the cut</span><label class="toggle-switch"><input type="checkbox" id="loop"><span class="toggle-track"></span></label></div></section>
-  <section class="panel hist-panel"><div class="panel-title">History <button class="btn-reset" id="hclr">Clear</button></div><div id="hist"></div></section>
+  <section class="panel hist-panel"><div class="panel-title">History <button class="btn-reset" id="hclr">Clear</button></div><div class="tabbar" id="htabs" role="tablist"><button class="tab" role="tab" data-t="songs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>Songs</button><button class="tab" role="tab" data-t="map"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/></svg>Compare</button><button class="tab" role="tab" data-t="bday"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Birthdays</button></div><div id="hist"></div></section>
 </div></div></main>
 <footer class="footer"><span class="footer-credit">Color Seed · see music, hear colour</span></footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>

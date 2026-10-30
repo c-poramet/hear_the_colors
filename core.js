@@ -17,23 +17,33 @@ C.dec = s => {
     lg: cl(n[4] / 100, 0, 1), lb: cl((n[5] - 100) / 100, -1, 1) };
 };
 C.fromHash = () => { const m = location.hash.match(/c=([\d.]+)/), p = m && C.dec(m[1]); if (p) C.save(p); return p };
-C.fromDate = d => { // same date -> same seed; consecutive days are spread as far apart as possible
-  const n = Math.floor(Date.parse(d + 'T00:00:00Z') / 864e5), f = a => { const v = n * a; return v - Math.floor(v) };
-  const [u, v, w, x, y] = [f(.8566748838545029), f(.7338918566271260), f(.6287067210378087), f(.5385972572236101), f(.4614027427763898)];
-  return C.dec(C.enc({ shift: u * 360, mir: f(.3819660112501051) > .5 ? 1 : 0, sg: .4 + v * .6, sb: w * .3, lg: .25 + x * .35, lb: .12 + y * .28 }));
-};
+C.yearMode = () => { try { return localStorage.getItem('colorseed.year') === '1' } catch (e) { return false } };
+C.setYearMode = v => { try { localStorage.setItem('colorseed.year', v ? '1' : '0') } catch (e) {} };
+const R5 = [.8566748838545029, .7338918566271260, .6287067210378087, .5385972572236101, .4614027427763898, .3819660112501051];
+C.fromDate = (d, y = C.yearMode()) => { // same day -> same seed. Year ignored (default): the 366 calendar days get evenly spaced hue shifts and the other knobs follow a low-discrepancy sequence, so neighbouring days land far apart. Year included: every calendar date since 1970 gets its own step of that sequence.
+  let n, u = null; if (y) n = Math.floor(Date.parse(d + 'T00:00:00Z') / 864e5); else { n = Math.round((Date.UTC(2000, +d.slice(5, 7) - 1, +d.slice(8, 10)) - Date.UTC(2000, 0, 1)) / 864e5); u = (n * 313 % 366) / 366 }
+  const f = a => { const v = n * a; return v - Math.floor(v) };
+  return C.dec(C.enc({ shift: (u ?? f(R5[0])) * 360, mir: f(R5[5]) > .5 ? 1 : 0, sg: .4 + f(R5[1]) * .6, sb: f(R5[2]) * .3, lg: .25 + f(R5[3]) * .35, lb: .12 + f(R5[4]) * .28 })) };
 
 /* ---------- birthdays ---------- */
-const dmy = iso => iso.slice(8) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4);
-C.parseDMY = s => { const m = String(s).trim().match(/^(\d{1,2})[\/.\-\s](\d{1,2})[\/.\-\s](\d{4})$/); if (!m) return null;
-  const d = +m[1], mo = +m[2], y = +m[3], t = new Date(Date.UTC(y, mo - 1, d));
+const dmy = iso => iso.slice(8) + '/' + iso.slice(5, 7) + (iso.startsWith('0000') ? '' : '/' + iso.slice(0, 4));
+C.fmtD = dmy; C.dkey = iso => C.yearMode() ? iso : '0000' + iso.slice(4); // year-less dates are stored as 0000-MM-DD
+C.parseDMY = s => { const m = String(s).trim().match(/^(\d{1,2})[\/.\-\s](\d{1,2})(?:[\/.\-\s](\d{4}))?$/); if (!m) return null;
+  const d = +m[1], mo = +m[2], y = m[3] ? +m[3] : C.yearMode() ? 0 : 2000; if (!y) return null; const t = new Date(Date.UTC(y, mo - 1, d));
   if (t.getUTCFullYear() !== y || t.getUTCMonth() !== mo - 1 || t.getUTCDate() !== d) return null;
-  return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0') };
-let BD = null, BDB = false; // seed code -> every date (1900-2030) that generates it; built in small background chunks so the page never stalls
-C.bdays = code => BD ? (BD.get(code) || []) : [];
-C.bdayBuild = cb => { if (BD || BDB) return; BDB = true; const m = new Map(), z = Date.UTC(2030, 11, 31) / 864e5; let n = Date.UTC(1900, 0, 1) / 864e5;
-  const step = () => { for (let i = 0; i < 1500 && n <= z; i++, n++) { const iso = new Date(n * 864e5).toISOString().slice(0, 10), k = C.enc(C.fromDate(iso)); m.has(k) ? m.get(k).push(iso) : m.set(k, [iso]) }
-    if (n <= z) setTimeout(step); else { BD = m; cb && cb() } };
+  return (m[3] ? m[3] : '0000') + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0') };
+let BD = [null, null], BDB = [0, 0]; // seed code -> every date that generates it, one map per mode (366 days, or 1900-2030), built in small chunks
+C.bdays = code => { const m = BD[+C.yearMode()]; return m ? (m.get(code) || []) : [] };
+C.bdayBuild = cb => { const y = +C.yearMode(); if (BD[y] || BDB[y]) return; BDB[y] = 1; const m = new Map(), a = Date.UTC(y ? 1900 : 2000, 0, 1) / 864e5, z = y ? Date.UTC(2030, 11, 31) / 864e5 : a + 365; let n = a;
+  const step = () => { for (let i = 0; i < 1500 && n <= z; i++, n++) { const t = new Date(n * 864e5).toISOString().slice(0, 10), iso = y ? t : '0000' + t.slice(4), k = C.enc(C.fromDate(iso, !!y)); m.has(k) ? m.get(k).push(iso) : m.set(k, [iso]) }
+    if (n <= z) setTimeout(step); else { BD[y] = m; cb && cb() } };
+  step() };
+// closeness of two seeds = average distance between the colours a fixed set of probe songs would get
+C.probe = p => { const o = []; for (let a = 0; a < 360; a += 45) for (const [s, l] of [[.3, .3], [.7, .6]]) { const c = C.color({ hx: Math.cos(a * Math.PI / 180), hy: Math.sin(a * Math.PI / 180), s0: s, l0: l }, p), r = c.h * Math.PI / 180; o.push([c.s * Math.cos(r), c.s * Math.sin(r), c.l]) } return o };
+C.nearDates = (p, y, cb, n = 12) => { const T = C.probe(p), out = [], a = Date.UTC(y ? 1900 : 2000, 0, 1) / 864e5, z = y ? Date.UTC(2030, 11, 31) / 864e5 : a + 365; let i = a;
+  const step = () => { for (let k = 0; k < 800 && i <= z; k++, i++) { const t = new Date(i * 864e5).toISOString().slice(0, 10), d = y ? t : '0000' + t.slice(4), Q = C.probe(C.fromDate(d, y));
+      out.push({ d, dist: Q.reduce((s, q, j) => s + Math.hypot(q[0] - T[j][0], q[1] - T[j][1], q[2] - T[j][2]), 0) / Q.length }) }
+    if (i <= z) setTimeout(step); else { out.sort((u, v) => u.dist - v.dist); cb(out.slice(0, n).map(x => ({ d: x.d, pct: Math.round(Math.max(0, 1 - x.dist / .8) * 100) }))) } };
   step() };
 const BHK = 'colorseed.bdays.v1', BCK = 'colorseed.bday.cur';
 const lsj = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch (e) { return d } }, lss = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch (e) {} };
@@ -64,14 +74,14 @@ const bSorted = H => { const k = bSort(), a = H.slice(); // H is stored most-rec
 // header tag: BIRTHDAY · label ×N  (label of the date in use, else of a labelled date matching this seed)
 const tagUpdate = () => { const b = document.getElementById('bday'); if (!b || !C._p) return;
   const code = C.enc(C._p), d = C.bdays(code), cur = lsj(BCK, null), H = C.bdayHist(),
-    used = cur && cur.code === code ? H.find(x => x.d === cur.d) : null, hit = used || H.find(x => d.includes(x.d) && x.label), lab = hit && hit.label;
+    used = cur && cur.code === code ? H.find(x => x.d === cur.d) : null, hit = used || H.find(x => d.includes(C.dkey(x.d)) && x.label), lab = hit && hit.label;
   b.classList.toggle('on', d.length > 0 || !!(cur && cur.code === code));
   b.textContent = 'BIRTHDAY' + (lab ? ' · ' + lab : '') + (d.length > 1 ? ' ×' + d.length : '');
   b.title = hit ? 'Birthday ' + dmy(hit.d) + (lab ? ' – ' + lab : '') : b.classList.contains('on') ? 'This seed comes from a birthday' : 'Birthday seeds' };
 const bRender = () => {
   const code = C.enc(C._p), cur = lsj(BCK, null), H = C.bdayHist(), m = C.bdays(code), used = cur && cur.code === code ? cur.d : null, pop = document.getElementById('bpop');
   const chips = l => `<div class="bp-chips">${l.slice(0, 12).map(x => `<button class="bp-chip" data-a="use" data-d="${x}">${dmy(x)}</button>`).join('')}</div>` + (l.length > 12 ? `<div class="bp-note">+${l.length - 12} more</div>` : '');
-  const lab = H.find(x => x.d === used), others = m.filter(x => x !== used);
+  const lab = H.find(x => x.d === used), others = m.filter(x => x !== (used && C.dkey(used)));
   const top = used ? `<div class="bp-cur"><span class="bp-date">${dmy(used)}</span><span class="bp-lab-cur">${lab && lab.label ? esc(lab.label) : 'in use'}</span></div>`
       + (others.length ? `<div class="bp-note">${others.length} other date${others.length > 1 ? 's' : ''} give the same seed:</div>` + chips(others) : '')
     : m.length ? `<div class="bp-note">This seed matches ${m.length > 1 ? m.length + ' birthdays' : 'a birthday'}. Pick one to keep it in your history:</div>` + chips(m)
@@ -80,7 +90,7 @@ const bRender = () => {
     : '<div class="bp-note">Nothing saved yet. Birthdays you use appear here.</div>';
   pop.innerHTML = `<div class="bp-scroll"><div class="bp-sec"><div class="bp-title">In use</div>${top}</div>
     <div class="bp-sec"><div class="bp-title bp-title-row"><span>History</span><select class="bp-sort" data-a="sort" aria-label="Sort history">${SORTS.map(o => `<option value="${o[0]}"${o[0] === bSort() ? ' selected' : ''}>${o[1]}</option>`).join('')}</select></div>${rows}</div>
-    <div class="bp-sec"><div class="bp-title">Add a birthday</div><div class="bp-add"><input class="field" id="bpin" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" aria-label="Birthdate"><button class="btn-reset" data-a="add">Use</button></div></div></div>`;
+    <div class="bp-sec"><div class="bp-title">Add a birthday</div><div class="bp-add"><input class="field" id="bpin" placeholder="${C.yearMode() ? 'dd/mm/yyyy' : 'dd/mm, year ignored'}" inputmode="numeric" maxlength="10" aria-label="Birthdate"><button class="btn-reset" data-a="add">Use</button></div><div class="toggle-row"><span class="toggle-label">Include year in seed</span><label class="toggle-switch"><input type="checkbox" data-a="yr" aria-label="Include year in seed"${C.yearMode() ? ' checked' : ''}><span class="toggle-track"></span></label></div></div></div>`;
 };
 C.seedTag = p => { const el = id => document.getElementById(id), code = C.enc(p), b = el('bday'), d = C.bdays(code); C._p = p; C.bdayBuild(() => C.seedTag(C._p));
   el('tag').textContent = 'SEED ' + code;
@@ -100,7 +110,8 @@ C.seedTag = p => { const el = id => document.getElementById(id), code = C.enc(p)
     pop.addEventListener('input', e => { const t = e.target;
       if (t.dataset.a === 'label') { const d = t.closest('.bp-row').dataset.d, H = C.bdayHist(), x = H.find(y => y.d === d); if (x) { x.label = t.value.trim(); lss(BHK, H); tagUpdate() } }
       if (t.id === 'bpin') { const v = t.value.replace(/\D/g, '').slice(0, 8); t.value = [v.slice(0, 2), v.slice(2, 4), v.slice(4)].filter(Boolean).join('/') } });
-    pop.addEventListener('change', e => { if (e.target.dataset.a === 'sort') { lss(BSK, e.target.value); bRender() } });
+    pop.addEventListener('change', e => { const a = e.target.dataset.a; if (a === 'sort') { lss(BSK, e.target.value); bRender() }
+      else if (a === 'yr') { const cur = lsj(BCK, null), was = cur && cur.code === C.enc(C._p); C.setYearMode(e.target.checked); if (was) use(cur.d); else { C.seedTag(C._p); bRender() } } });
     pop.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'bpin') pop.querySelector('[data-a=add]').click() }) }
   tagUpdate();
   if (!pop.hidden) { bRender(); bPlace() } };
@@ -217,11 +228,14 @@ const HK = 'colorseed.history.v1';
 C.hist = () => { try { return JSON.parse(localStorage.getItem(HK)) || [] } catch (e) { return [] } };
 C.histAdd = (name, fr, art) => {
   const f = C.fingerprint(fr), s = C.sum(fr), H = C.hist(), r = (x, d) => +x.toFixed(d);
-  const e = { name, fp: f.fp, L: f.L.map(x => r(x, 2)), R: f.R.map(x => r(x, 2)), raw: { hx: r(s.hx, 4), hy: r(s.hy, 4), l0: r(s.l0, 4), s0: r(s.s0, 4) }, dur: Math.round(fr.n * fr.dt), t: Date.now() };
+  const e = { name, fp: f.fp, L: f.L.map(x => r(x, 2)), R: f.R.map(x => r(x, 2)), raw: { hx: r(s.hx, 4), hy: r(s.hy, 4), l0: r(s.l0, 4), s0: r(s.s0, 4) }, dur: Math.round(fr.n * fr.dt), T: C.traj(fr), t: Date.now() };
   const i = H.findIndex(x => x.fp === e.fp || (x.name === name && C.sim(x.fp, e.fp) > .9));
   if (art) e.art = art; else if (i >= 0 && H[i].art) e.art = H[i].art;
   if (i >= 0) H.splice(i, 1);
   H.unshift(e); C.histSave(H); return { e, H } };
+// 40 snapshots of the running colour: lets share cards replay the path a song took
+C.traj = fr => Array.from({ length: 40 }, (_, i) => { const s = C.sum(fr, 0, Math.max(1, Math.round(fr.n * (i + 1) / 40))); return [s.hx, s.hy, s.l0, s.s0].map(v => +v.toFixed(3)) });
+C.trajColors = (e, p) => (e.T || []).map(t => C.color({ hx: t[0], hy: t[1], l0: t[2], s0: t[3] }, p));
 C.histSave = H => { try { localStorage.setItem(HK, JSON.stringify(H.slice(0, 60))) } catch (e) {} };
 C.glyph = (cv, e, col) => { // 64 ticks = the fingerprint bits; inner shape = the song's busyness/brightness contour
   const g = cv.getContext('2d'), S = cv.width, c = S / 2; g.clearRect(0, 0, S, S); g.lineCap = 'round'; g.lineWidth = S / 40; g.strokeStyle = col;
