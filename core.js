@@ -260,6 +260,34 @@ C.histAdd = (name, fr, art, meta = {}) => {
 C.traj = fr => Array.from({ length: 40 }, (_, i) => { const s = C.sum(fr, 0, Math.max(1, Math.round(fr.n * (i + 1) / 40))); return [s.hx, s.hy, s.l0, s.s0].map(v => +v.toFixed(3)) });
 C.trajColors = (e, p) => (e.T || []).map(t => C.color({ hx: t[0], hy: t[1], l0: t[2], s0: t[3] }, p));
 C.histSave = H => { try { localStorage.setItem(HK, JSON.stringify(H.slice(0, 60))) } catch (e) {} };
+C.histExport = () => ({ format: 'hear-see-history', version: 1, exportedAt: new Date().toISOString(), songs: C.hist() });
+C.histImport = value => {
+  const songs = Array.isArray(value) ? value : value && value.format === 'hear-see-history' && value.version === 1 ? value.songs : null;
+  if (!Array.isArray(songs)) throw new Error('Unsupported history file');
+  const valid = songs.filter(e => {
+    if (!e || typeof e !== 'object' || typeof e.name !== 'string' || !/^[0-9a-f]{16}$/i.test(e.fp)) return false;
+    if (!Array.isArray(e.L) || !Array.isArray(e.R) || !e.raw || !Number.isFinite(e.dur)) return false;
+    if (!['hx', 'hy', 'l0', 's0'].every(k => Number.isFinite(e.raw[k]))) return false;
+    if (!e.L.every(Number.isFinite) || !e.R.every(Number.isFinite)) return false;
+    if (e.T !== undefined && (!Array.isArray(e.T) || e.T.some(t => !Array.isArray(t) || t.length < 4 || t.slice(0, 4).some(v => !Number.isFinite(v))))) return false;
+    return !e.art || (typeof e.art === 'string' && e.art.startsWith('data:image/') && e.art.length <= 2 * 1024 * 1024);
+  }).map(e => ({
+    name: e.name.slice(0, 240), fp: e.fp.toLowerCase(), L: e.L.slice(0, 64), R: e.R.slice(0, 64),
+    raw: { hx: e.raw.hx, hy: e.raw.hy, l0: e.raw.l0, s0: e.raw.s0 }, dur: Math.max(0, Math.round(e.dur)),
+    T: Array.isArray(e.T) ? e.T.slice(0, 40).map(t => t.slice(0, 4)) : [], t: Number.isFinite(e.t) ? e.t : Date.now(),
+    meta: e.meta && typeof e.meta === 'object' ? { artist: String(e.meta.artist || '').slice(0, 240), album: String(e.meta.album || '').slice(0, 240), year: String(e.meta.year || '').slice(0, 4) } : {},
+    ...(e.art ? { art: e.art } : {})
+  }));
+  const existing = C.hist(), merged = [...valid, ...existing];
+  const out = [];
+  for (const e of merged) {
+    if (out.some(x => x.fp === e.fp || (x.name === e.name && C.sim(x.fp, e.fp) > .9))) continue;
+    out.push(e);
+    if (out.length === 60) break;
+  }
+  const added = out.filter(e => !existing.some(x => x.fp === e.fp || (x.name === e.name && C.sim(x.fp, e.fp) > .9))).length;
+  C.histSave(out); return { imported: valid.length, added, total: out.length };
+};
 C.glyph = (cv, e, col) => { // 64 ticks = the fingerprint bits; inner shape = the song's busyness/brightness contour
   const g = cv.getContext('2d'), S = cv.width, c = S / 2; g.clearRect(0, 0, S, S); g.lineCap = 'round'; g.lineWidth = S / 40; g.strokeStyle = col;
   for (let i = 0; i < 64; i++) { const bit = (parseInt(e.fp[i >> 2], 16) >> (3 - (i & 3))) & 1, a = i / 64 * TAU - Math.PI / 2;

@@ -209,7 +209,7 @@ function pairCard(a, b, i, j) { const r = rel(a, b), A = r.A, B = r.B, ca = C.cs
   <div class="prow"><span>Saturation</span><div class="bars color-bars"><div>${thumb(a, A.c)}${bar(A.c.s, ca)}</div><div>${thumb(b, B.c)}${bar(B.c.s, cb)}</div></div></div>
   <div class="prow"><span>Light</span><div class="bars color-bars"><div>${thumb(a, A.c)}${bar(A.c.l, ca)}</div><div>${thumb(b, B.c)}${bar(B.c.l, cb)}</div></div></div></div>` }
 function mapView(L, box) { const n = L.slice(0, 8); msel = hsel < n.length ? hsel : -1; pair = pair.map(i => Math.min(i, n.length - 1));
-  const actions = $('hist-actions'); actions.innerHTML = `<div class="compare-head-controls"><div class="seg"><button class="seg-btn${mapMode === 'wheel' ? ' on' : ''}" data-m="wheel">Wheel</button><button class="seg-btn${mapMode === 'bars' ? ' on' : ''}" data-m="bars">HSL</button></div><div class="seg"><button class="seg-btn${!selectMap ? ' on' : ''}" data-select="0">Triangle</button><button class="seg-btn${selectMap ? ' on' : ''}" data-select="1">Select</button></div><label class="head-toggle${selectMap ? ' disabled' : ''}" title="${selectMap ? 'Only available in Triangle mode' : 'Show only half of the comparison triangle'}"><span>Half</span><input type="checkbox" data-half${halfMap ? ' checked' : ''}${selectMap ? ' disabled' : ''}><i></i></label><button class="btn-reset" data-clear>Clear</button></div>`;
+  const actions = $('hist-actions'); actions.innerHTML = `<div class="compare-head-controls"><div class="seg"><button class="seg-btn${mapMode === 'wheel' ? ' on' : ''}" data-m="wheel">Wheel</button><button class="seg-btn${mapMode === 'bars' ? ' on' : ''}" data-m="bars">HSL</button></div><div class="seg"><button class="seg-btn${!selectMap ? ' on' : ''}" data-select="0">Triangle</button><button class="seg-btn${selectMap ? ' on' : ''}" data-select="1">Select</button></div><label class="head-toggle${selectMap ? ' disabled' : ''}" title="${selectMap ? 'Only available in Triangle mode' : 'Show only half of the comparison triangle'}"><span>Half</span><input type="checkbox" data-half${halfMap ? ' checked' : ''}${selectMap ? ' disabled' : ''}><i></i></label><button class="btn-reset" data-clear>Clear</button><button class="btn-reset" id="himport">Import</button><button class="btn-reset" id="hexport">Export</button><input type="file" id="hfile" accept="application/json,.json" hidden></div>`;
   actions.onclick = e => {
     const b = e.target.closest('[data-m],[data-select],[data-half],[data-metric],[data-clear]');
     if (!b) return;
@@ -224,6 +224,8 @@ function mapView(L, box) { const n = L.slice(0, 8); msel = hsel < n.length ? hse
     else { halfMap = b.checked; lsSet('colorseed.half', halfMap ? '1' : '0') }
     renderHist();
   };
+  $('hexport').onclick = exportHistory; $('himport').onclick = () => $('hfile').click();
+  $('hfile').onchange = e => { const f = e.target.files[0]; if (f) importHistory(f); e.target.value = '' };
   const seg = '';
   const scores = []; for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) scores.push(metricPct(n[i], n[j])); const lo = Math.min(...scores), hi = Math.max(...scores), norm = p => hi === lo ? 1 : (p - lo) / (hi - lo);
   const metric = `<div class="compare-metric" aria-label="Comparison channels"><span>Compare by</span><div class="seg"><button class="seg-btn${compareMetric === 'hsl' ? ' on' : ''}" data-metric="all">All</button><button class="seg-btn${compareMetric.includes('h') ? ' on' : ''}" data-metric="h">H</button><button class="seg-btn${compareMetric.includes('s') ? ' on' : ''}" data-metric="s">S</button><button class="seg-btn${compareMetric.includes('l') ? ' on' : ''}" data-metric="l">L</button></div></div>`;
@@ -241,7 +243,10 @@ function bdayView(L, box) { const H = C.bdayHist(), e = L[hsel];
   C.wheel($('bdcv'), R.map((r, i) => bdOff.has(r.k) ? null : { h: r.c.h, s: r.c.s, color: C.css(r.c), label: i + 1 }).filter(Boolean)) }
 function renderHist() { const L = C.hist(), box = $('hist'); hsel = Math.min(hsel, Math.max(0, L.length - 1));
   document.querySelectorAll('#htabs [data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === htab));
-  if (htab !== 'map') { $('hist-actions').innerHTML = '<button class="btn-reset" id="hclr">Clear</button>'; $('hclr').onclick = clearHistory }
+  $('hist-actions').innerHTML = '<button class="btn-reset" id="himport">Import</button><button class="btn-reset" id="hexport">Export</button><button class="btn-reset" id="hclr">Clear</button><input type="file" id="hfile" accept="application/json,.json" hidden>';
+  $('hexport').onclick = exportHistory; $('himport').onclick = () => $('hfile').click();
+  $('hfile').onchange = e => { const f = e.target.files[0]; if (f) importHistory(f); e.target.value = '' };
+  $('hclr').onclick = clearHistory;
   if (!L.length) { box.innerHTML = empty('Songs you play collect here as cards: cover, colour, key, rhythm and brightness at a glance. Compare them and try them under your birthdays.'); return }
   (htab === 'map' ? mapView : htab === 'bday' ? bdayView : songsView)(L, box) }
 $('htabs').onclick = e => { const t = e.target.closest('[data-t]'); if (t) { htab = t.dataset.t; lsSet('colorseed.htab', htab); renderHist() } };
@@ -285,6 +290,20 @@ let sure = 0;
 function clearHistory() { const b = $('hclr'); if (!C.hist().length) return;
   if (sure) { clearTimeout(sure); sure = 0; b.textContent = 'Clear'; C.histSave([]); renderHist(); C.toast('History cleared'); return }
   b.textContent = 'Sure?'; sure = setTimeout(() => { sure = 0; b.textContent = 'Clear' }, 2500) }
+function exportHistory() {
+  const blob = new Blob([JSON.stringify(C.histExport(), null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'hear-see-history.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000); C.toast('History exported');
+}
+async function importHistory(file) {
+  try {
+    const result = C.histImport(JSON.parse(await file.text()));
+    renderHist(); C.toast(result.added ? `Imported ${result.added} song${result.added === 1 ? '' : 's'}` : 'No new songs found');
+  } catch (err) { C.toast('Could not import that history file') }
+}
+$('hexport').onclick = exportHistory;
+$('himport').onclick = () => $('hfile').click();
+$('hfile').onchange = e => { const f = e.target.files[0]; if (f) importHistory(f); e.target.value = '' };
 
 /* ---------- drawing ---------- */
 function drawStrip(idx) {
