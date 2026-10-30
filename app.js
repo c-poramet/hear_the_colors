@@ -65,8 +65,9 @@ $('dob').oninput = e => { const v = e.target.value.replace(/\D/g, '').slice(0, 8
 $('dob').onkeydown = e => { if (e.key === 'Enter') $('gen').click() };
 $('gen').onclick = () => { const iso = C.parseDMY($('dob').value);
   if (!iso) { $('dobmsg').textContent = 'Enter a real date as dd/mm/yyyy.'; return }
-  $('dobmsg').textContent = DOBHINT; P = C.fromDate(iso); commit() };
-$('copy').onclick = () => navigator.clipboard.writeText($('code').value).then(() => $('copy').textContent = 'Copied ✓', () => $('code').select());
+  $('dobmsg').textContent = DOBHINT; P = C.bdayUse(iso); commit(); C.toast('Seed from ' + $('dob').value) };
+C.onSeed = p => { P = p; commit() };
+$('copy').onclick = () => C.copy($('code').value).then(() => C.toast('Link copied'));
 $('dl').onclick = () => $('qr').toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'seed-' + C.enc(P) + '.png'; a.click() });
 $('apply').onclick = () => { const m = $('imp').value.match(/c=([\d.]+)/), p = C.dec(m ? m[1] : $('imp').value);
   if (p) { P = p; commit(); $('imp').value = '' } else $('imp').placeholder = 'Invalid code' };

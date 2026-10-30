@@ -1,29 +1,37 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Color Seed – Play</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"><meta name="theme-color" content="#2b2b2b">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css"></head>
 <body>
 <header class="header"><span class="header-title">Color Seed</span><span class="header-dot" id="dot"></span><span class="header-sub">play</span>
-<a class="mode-link on" href="index.html">Play</a><a class="mode-link" href="calibrate.html">Calibrate</a><button class="guesses-left-badge bday-badge" id="bday" hidden></button><span class="guesses-left-badge" id="tag"></span></header>
+<a class="mode-link on" href="index.html">Play</a><a class="mode-link" href="calibrate.html">Calibrate</a><button class="guesses-left-badge bday-badge" id="bday">BIRTHDAY</button><span class="guesses-left-badge" id="tag"></span></header>
 <main class="main"><div class="solver-layout">
 <section class="left-panel panel stage" id="stage">
   <div class="panel-title">Now playing <span id="song">nothing loaded</span></div>
-  <canvas id="orb" width="640" height="640"></canvas>
+  <div class="viz-wrap">
+    <canvas id="viz" width="800" height="560" role="img" aria-label="Live audio spectrum with the running colour"></canvas>
+    <div class="viz-toggle"><span>HSL bars</span><label class="toggle-switch"><input type="checkbox" id="hslt" aria-label="Show HSL bars instead of the colour wheel"><span class="toggle-track"></span></label></div>
+    <div class="viz-empty" id="empty">Drop an audio file here, or press Load audio</div>
+  </div>
   <div class="stats-bar compact">
     <div class="stat-chip"><span class="stat-val" id="sH">–</span><span class="stat-lbl">hue</span></div>
     <div class="stat-chip"><span class="stat-val" id="sS">–</span><span class="stat-lbl">saturation</span></div>
     <div class="stat-chip"><span class="stat-val" id="sL">–</span><span class="stat-lbl">lightness</span></div>
     <div class="stat-chip"><span class="stat-val" id="sR">–</span><span class="stat-lbl">hits / s</span></div></div>
   <div class="transport">
-    <button class="play-btn" id="pp" aria-label="Play or pause">
+    <button class="play-btn" id="pp" aria-label="Play or pause" title="Play / pause (Space)" disabled>
       <svg class="i-play" width="18" height="18" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg>
       <svg class="i-pause" width="18" height="18" viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z" fill="currentColor"/></svg></button>
     <span class="mono" id="time">0:00 / 0:00</span>
+    <div class="vol"><button class="icon-btn" id="mute" aria-label="Mute" title="Mute (M)"><svg id="vi" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg></button>
+      <input type="range" id="vol" class="vol-range" min="0" max="1" step="0.01" aria-label="Volume" title="Volume (↑ ↓)"></div>
     <label class="btn-reset load-btn">Load audio<input type="file" id="file" accept="audio/*" hidden></label></div>
   <audio id="au" hidden></audio>
-  <canvas id="strip" width="800" height="56"></canvas>
-  <p class="hint" id="status">Click to seek, drag to cut a piece. Space plays and pauses.</p>
+  <canvas id="strip" width="800" height="56" aria-label="Timeline: click to seek, drag to cut a piece"></canvas>
+  <div class="progress" id="progw"><i id="prog"></i></div>
+  <p class="hint" id="status">Click the timeline to seek, drag to cut a piece. Space plays, ← → seek, ↑ ↓ volume, M mutes.</p>
 </section>
 <div class="right-panel">
   <section class="panel"><div class="panel-title">Cut <button class="btn-reset" id="cclr">Clear</button></div>
@@ -33,5 +41,5 @@
 </div></div></main>
 <footer class="footer"><span class="footer-credit">Color Seed · see music, hear colour</span></footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
-<script src="core.js"></script><script src="play.js"></script>
+<script src="core.js"></script><script src="card.js"></script><script src="play.js"></script>
 </body></html>

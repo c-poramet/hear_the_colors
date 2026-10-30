@@ -29,29 +29,75 @@ C.parseDMY = s => { const m = String(s).trim().match(/^(\d{1,2})[\/.\-\s](\d{1,2
   const d = +m[1], mo = +m[2], y = +m[3], t = new Date(Date.UTC(y, mo - 1, d));
   if (t.getUTCFullYear() !== y || t.getUTCMonth() !== mo - 1 || t.getUTCDate() !== d) return null;
   return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0') };
-let BD = null; // seed code -> every date (1900-2030) that generates it; built once, on first use
-C.bdays = code => { if (!BD) { BD = new Map();
-    for (let n = Date.UTC(1900, 0, 1) / 864e5, z = Date.UTC(2030, 11, 31) / 864e5; n <= z; n++) {
-      const iso = new Date(n * 864e5).toISOString().slice(0, 10), k = C.enc(C.fromDate(iso)); BD.has(k) ? BD.get(k).push(iso) : BD.set(k, [iso]) } }
-  return BD.get(code) || [] };
-C.seedTag = p => { const el = id => document.getElementById(id), code = C.enc(p), b = el('bday'), t = el('tag'), d = C.bdays(code);
+let BD = null, BDB = false; // seed code -> every date (1900-2030) that generates it; built in small background chunks so the page never stalls
+C.bdays = code => BD ? (BD.get(code) || []) : [];
+C.bdayBuild = cb => { if (BD || BDB) return; BDB = true; const m = new Map(), z = Date.UTC(2030, 11, 31) / 864e5; let n = Date.UTC(1900, 0, 1) / 864e5;
+  const step = () => { for (let i = 0; i < 1500 && n <= z; i++, n++) { const iso = new Date(n * 864e5).toISOString().slice(0, 10), k = C.enc(C.fromDate(iso)); m.has(k) ? m.get(k).push(iso) : m.set(k, [iso]) }
+    if (n <= z) setTimeout(step); else { BD = m; cb && cb() } };
+  step() };
+const BHK = 'colorseed.bdays.v1', BCK = 'colorseed.bday.cur';
+const lsj = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch (e) { return d } }, lss = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch (e) {} };
+const esc = s => String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+C.bdayHist = () => lsj(BHK, []);
+C.bdayUse = iso => { const p = C.fromDate(iso), H = C.bdayHist(), i = H.findIndex(x => x.d === iso), e = i >= 0 ? H.splice(i, 1)[0] : { d: iso, label: '' };
+  H.unshift(e); lss(BHK, H.slice(0, 30)); lss(BCK, { d: iso, code: C.enc(p) }); return p };
+
+/* ---------- small shared UI helpers ---------- */
+C.toast = msg => { let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t) }
+  t.textContent = msg; t.classList.add('show'); clearTimeout(C._tt); C._tt = setTimeout(() => t.classList.remove('show'), 1800) };
+C.copy = t => { const old = () => { const a = document.createElement('textarea'); a.value = t; a.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(a); a.select(); try { document.execCommand('copy') } catch (e) {} a.remove() };
+  return navigator.clipboard ? navigator.clipboard.writeText(t).catch(old) : Promise.resolve(old()) };
+C.rr = (g, x, y, w, h, r) => { r = Math.min(r, w / 2, h / 2); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath() };
+
+/* ---------- birthday tag + popover (current, history, labels) ---------- */
+const bPlace = () => { const pop = document.getElementById('bpop'), r = document.getElementById('bday').getBoundingClientRect(),
+    w = Math.min(320, innerWidth - 16), cx = r.left + r.width / 2, left = cl(cx - w / 2, 8, innerWidth - w - 8);
+  pop.style.width = w + 'px'; pop.style.left = left + 'px'; pop.style.top = r.bottom + 10 + 'px'; pop.style.setProperty('--cx', cx - left + 'px') };
+const bRender = () => {
+  const code = C.enc(C._p), cur = lsj(BCK, null), H = C.bdayHist(), m = C.bdays(code), used = cur && cur.code === code ? cur.d : null, pop = document.getElementById('bpop');
+  const chips = l => `<div class="bp-chips">${l.slice(0, 12).map(x => `<button class="bp-chip" data-a="use" data-d="${x}">${dmy(x)}</button>`).join('')}</div>` + (l.length > 12 ? `<div class="bp-note">+${l.length - 12} more</div>` : '');
+  const lab = H.find(x => x.d === used), others = m.filter(x => x !== used);
+  const top = used ? `<div class="bp-cur"><span class="bp-date">${dmy(used)}</span><span class="bp-lab-cur">${lab && lab.label ? esc(lab.label) : 'in use'}</span></div>`
+      + (others.length ? `<div class="bp-note">${others.length} other date${others.length > 1 ? 's' : ''} give the same seed:</div>` + chips(others) : '')
+    : m.length ? `<div class="bp-note">This seed matches ${m.length > 1 ? m.length + ' birthdays' : 'a birthday'}. Pick one to keep it in your history:</div>` + chips(m)
+    : '<div class="bp-note">This seed does not come from a birthday. Add one below to switch to it.</div>';
+  const rows = H.length ? H.map(x => `<div class="bp-row${x.d === used ? ' cur' : ''}" data-d="${x.d}"><button class="bp-date" data-a="use" title="Use this birthday">${dmy(x.d)}</button><input class="bp-lab" data-a="label" maxlength="24" placeholder="Add a label" value="${esc(x.label || '')}" aria-label="Label for ${dmy(x.d)}"><button class="btn-reset bp-del" data-a="del" title="Remove" aria-label="Remove ${dmy(x.d)}">✕</button></div>`).join('')
+    : '<div class="bp-note">Nothing saved yet. Birthdays you use appear here.</div>';
+  pop.innerHTML = `<div class="bp-scroll"><div class="bp-sec"><div class="bp-title">In use</div>${top}</div>
+    <div class="bp-sec"><div class="bp-title">History</div>${rows}</div>
+    <div class="bp-sec"><div class="bp-title">Add a birthday</div><div class="bp-add"><input class="field" id="bpin" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" aria-label="Birthdate"><button class="btn-reset" data-a="add">Use</button></div></div></div>`;
+};
+C.seedTag = p => { const el = id => document.getElementById(id), code = C.enc(p), b = el('bday'), d = C.bdays(code); C._p = p; C.bdayBuild(() => C.seedTag(C._p));
+  el('tag').textContent = 'SEED ' + code;
   let pop = el('bpop');
-  if (!pop) { pop = document.createElement('div'); pop.id = 'bpop'; pop.className = 'bday-pop'; pop.hidden = true; document.body.appendChild(pop);
-    b.onclick = () => pop.hidden = !pop.hidden;
-    addEventListener('click', e => { if (e.target !== b && !pop.contains(e.target)) pop.hidden = true });
-    addEventListener('keydown', e => { if (e.key === 'Escape') pop.hidden = true }) }
-  t.textContent = 'SEED ' + code;
-  b.hidden = !d.length; if (!d.length) pop.hidden = true;
+  if (!pop) { pop = document.createElement('div'); pop.id = 'bpop'; pop.className = 'bday-pop'; pop.hidden = true; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Birthday seeds'); document.body.appendChild(pop);
+    const shut = () => { pop.hidden = true; b.setAttribute('aria-expanded', 'false') };
+    b.setAttribute('aria-haspopup', 'dialog'); b.setAttribute('aria-expanded', 'false');
+    b.onclick = () => { pop.hidden = !pop.hidden; b.setAttribute('aria-expanded', String(!pop.hidden)); if (!pop.hidden) { bRender(); bPlace() } };
+    addEventListener('click', e => { const path = e.composedPath(); if (!pop.hidden && !path.includes(pop) && !path.includes(b)) shut() });
+    addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden) shut() });
+    addEventListener('resize', () => { if (!pop.hidden) bPlace() });
+    const use = iso => { const q = C.bdayUse(iso); C.save(q); C.toast('Using ' + dmy(iso)); C.onSeed ? C.onSeed(q) : C.seedTag(q) };
+    pop.addEventListener('click', e => { const a = e.target.closest('[data-a]'); if (!a) return; const act = a.dataset.a;
+      if (act === 'use') use(a.dataset.d || a.closest('.bp-row').dataset.d);
+      else if (act === 'del') { const d = a.closest('.bp-row').dataset.d; lss(BHK, C.bdayHist().filter(x => x.d !== d)); bRender() }
+      else if (act === 'add') { const iso = C.parseDMY(pop.querySelector('#bpin').value); iso ? use(iso) : C.toast('Enter a real date as dd/mm/yyyy') } });
+    pop.addEventListener('input', e => { const t = e.target;
+      if (t.dataset.a === 'label') { const d = t.closest('.bp-row').dataset.d, H = C.bdayHist(), x = H.find(y => y.d === d); if (x) { x.label = t.value.trim(); lss(BHK, H) } }
+      if (t.id === 'bpin') { const v = t.value.replace(/\D/g, '').slice(0, 8); t.value = [v.slice(0, 2), v.slice(2, 4), v.slice(4)].filter(Boolean).join('/') } });
+    pop.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'bpin') pop.querySelector('[data-a=add]').click() }) }
+  const cur = lsj(BCK, null); b.classList.toggle('on', d.length > 0 || !!(cur && cur.code === code));
   b.textContent = d.length > 1 ? 'BIRTHDAY ×' + d.length : 'BIRTHDAY';
-  pop.innerHTML = `<div class="bday-head">${d.length > 1 ? d.length + ' birthdays, one seed' : 'Birthday seed'}</div><div class="bday-list">${d.slice(0, 60).map(x => `<span>${dmy(x)}</span>`).join('')}</div>`
-    + (d.length > 60 ? `<div class="bday-more">+${d.length - 60} more</div>` : '') };
+  b.title = b.classList.contains('on') ? 'This seed comes from a birthday' : 'Birthday seeds';
+  if (!pop.hidden) { bRender(); bPlace() } };
 
 /* ---------- cover art (embedded tags, via jsmediatags) -> 96px jpeg data url ---------- */
 C.cover = f => new Promise(res => { if (!window.jsmediatags) return res(null);
   try { jsmediatags.read(f, { onError: () => res(null), onSuccess: t => { const p = t.tags && t.tags.picture; if (!p) return res(null);
     const url = URL.createObjectURL(new Blob([new Uint8Array(p.data)], { type: p.format || 'image/jpeg' })), im = new Image();
     im.onerror = () => { URL.revokeObjectURL(url); res(null) };
-    im.onload = () => { const S = 96, k = Math.min(im.width, im.height), c = document.createElement('canvas'); c.width = c.height = S;
+    im.onload = () => { const S = 192, k = Math.min(im.width, im.height), c = document.createElement('canvas'); c.width = c.height = S;
       c.getContext('2d').drawImage(im, (im.width - k) / 2, (im.height - k) / 2, k, k, 0, 0, S, S); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', .72)) };
     im.src = url } }) } catch (e) { res(null) } });
 
