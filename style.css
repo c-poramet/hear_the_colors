@@ -19,7 +19,7 @@ body{background:var(--bg);color:var(--text-pri);font-family:var(--font-ui);font-
 .guesses-left-badge{font-family:var(--font-mono);font-size:var(--fs-xs);font-weight:700;color:var(--accent);letter-spacing:.04em;background:rgba(201,127,80,.1);border:1px solid rgba(201,127,80,.2);border-radius:6px;padding:6px 12px}.bday-badge{margin-left:auto}
 #tag{margin-left:0;max-width:min(360px,32vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;transition:background .15s,border-color .15s}#tag:hover{background:rgba(201,127,80,.18);border-color:rgba(201,127,80,.35)}#tag:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .main{display:flex;justify-content:center;height:100vh;overflow:hidden;padding:86px 16px 44px}
-.solver-layout{display:flex;gap:16px;width:100%;max-width:1480px;height:100%;align-items:stretch;margin-top:12px}
+.solver-layout{display:flex;gap:16px;width:100%;max-width:1480px;height:calc(100% - 12px);align-items:stretch;margin-top:12px}
 .left-panel{flex:0 0 min(540px,40%);min-width:0;display:flex;flex-direction:column;overflow:hidden}
 .right-panel{flex:1;min-width:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:12px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent;padding-bottom:4px}
 .right-panel::-webkit-scrollbar{width:4px}.right-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
