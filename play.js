@@ -107,7 +107,7 @@ function cutUI() {
 }
 $('cutbox').onclick = e => { if (!cut || !fr || !e.target.closest('.cut-row')) return; const hex = C.hex(C.color(C.sum(fr, cut[0], cut[1]), P)); C.copy(hex).then(() => C.toast('Copied ' + hex)) };
 /* ---------- history: songs / compare / birthdays, all card based ---------- */
-let paletteSong = null, paletteClose = null, htab = lsGet('colorseed.htab', 'songs'), mapMode = lsGet('colorseed.map', 'wheel'), songMode = lsGet('colorseed.songs', 'row'), groupBy = lsGet('colorseed.group.by', 'hue'), groupSteps = +lsGet('colorseed.group.steps', '4'), halfMap = lsGet('colorseed.half', '0') === '1', selectMap = lsGet('colorseed.select', '0') === '1', compareMetric = lsGet('colorseed.metric', 'hsl'), hsel = 0, analysisPair = [0, 1], pair = [0, 1], msel = -1; const bdOff = new Set();
+let paletteSong = null, paletteClose = null, htab = lsGet('colorseed.htab', 'songs'), mapMode = lsGet('colorseed.map', 'wheel'), songMode = lsGet('colorseed.songs', 'row'), analysisMode = lsGet('colorseed.analysis.mode', 'compare'), groupBy = lsGet('colorseed.group.by', 'hue'), groupSteps = +lsGet('colorseed.group.steps', '4'), halfMap = lsGet('colorseed.half', '0') === '1', selectMap = lsGet('colorseed.select', '0') === '1', compareMetric = lsGet('colorseed.metric', 'hsl'), hsel = 0, analysisPair = [0, 1], pair = [0, 1], msel = -1; const bdOff = new Set();
 if (!/^[hsl]+$/.test(compareMetric) || !compareMetric) compareMetric = 'hsl';
 if (!['songs', 'map', 'analysis', 'groups', 'bday'].includes(htab)) htab = 'songs';
 const KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯', 'A♭', 'E♭', 'B♭', 'F'], rad = d => d * Math.PI / 180;
@@ -251,9 +251,10 @@ function analysisDetail(e, label) {
 }
 function analysisView(L, box) {
   if (!L.length) { box.innerHTML = empty('Analyze a song to compare its colour formation.'); return }
+  const solo = analysisMode === 'solo';
   analysisPair = analysisPair.map((i, slot) => Math.min(L.length - 1, Math.max(0, Number.isInteger(i) ? i : slot)));
   if (analysisPair[0] === analysisPair[1] && L.length > 1) analysisPair[1] = analysisPair[0] ? 0 : 1;
-  box.innerHTML = `<div class="analysis-picker-row">${analysisPicker(L, 0, analysisPair[0])}${analysisPicker(L, 1, analysisPair[1])}</div><p class="hint analysis-compare-note">Compare both songs side by side. Each chart uses its own strongest value for readable detail; percentages remain absolute.</p><div class="analysis-columns">${analysisDetail(L[analysisPair[0]], 'A')}${analysisDetail(L[analysisPair[1]], 'B')}</div>`;
+  box.innerHTML = `<div class="analysis-toolbar"><span class="hint">Analysis mode</span><div class="seg"><button class="seg-btn${solo ? ' on' : ''}" data-analysis-mode="solo">Solo</button><button class="seg-btn${!solo ? ' on' : ''}" data-analysis-mode="compare">Compare</button></div></div>${solo ? `<div class="analysis-picker-row solo-picker">${analysisPicker(L, 0, hsel)}</div><p class="hint analysis-compare-note">Inspect one song in a wider layout.</p><div class="analysis-columns solo-analysis">${analysisDetail(L[hsel], 'Song')}</div>` : `<div class="analysis-picker-row">${analysisPicker(L, 0, analysisPair[0])}${analysisPicker(L, 1, analysisPair[1])}</div><p class="hint analysis-compare-note">Compare both songs side by side. Each chart uses its own strongest value for readable detail; percentages remain absolute.</p><div class="analysis-columns">${analysisDetail(L[analysisPair[0]], 'A')}${analysisDetail(L[analysisPair[1]], 'B')}</div>`}`;
 }
 function groupsView(L, box) {
   const value = e => { const c = facts(e).c, r = e.raw.rr == null ? e.raw.s0 : e.raw.rr, l = e.raw.contrast == null ? e.raw.l0 : e.raw.contrast; return groupBy === 'hue' ? c.h / 360 : groupBy === 'saturation' ? r : l };
@@ -324,12 +325,13 @@ function renderHist() { const L = C.hist(), box = $('hist'); hsel = Math.min(hse
   (htab === 'map' ? mapView : htab === 'analysis' ? analysisView : htab === 'groups' ? groupsView : htab === 'bday' ? bdayView : songsView)(L, box) }
 $('htabs').onclick = e => { const t = e.target.closest('[data-t]'); if (t) { htab = t.dataset.t; lsSet('colorseed.htab', htab); renderHist() } };
 $('hist').onclick = e => { const q = s => e.target.closest(s), L = C.hist(); let b;
+  if ((b = q('[data-analysis-mode]'))) { analysisMode = b.dataset.analysisMode; lsSet('colorseed.analysis.mode', analysisMode); renderHist(); return }
   if ((b = q('[data-analysis-menu]'))) {
     const slot = +b.dataset.analysisMenu, menu = document.querySelector(`[data-analysis-menu-list="${slot}"]`);
     document.querySelectorAll('.analysis-song-menu').forEach(x => { if (x !== menu) x.hidden = true });
     menu.hidden = !menu.hidden; b.setAttribute('aria-expanded', String(!menu.hidden)); return;
   }
-  if ((b = q('[data-analysis-song]'))) { analysisPair[+b.dataset.analysisSong] = +b.dataset.i; renderHist(); return }
+  if ((b = q('[data-analysis-song]'))) { const slot = +b.dataset.analysisSong, index = +b.dataset.i; if (analysisMode === 'solo') hsel = index; else analysisPair[slot] = index; renderHist(); return }
   if ((b = q('[data-group-song]'))) { hsel = +b.dataset.groupSong; renderHist(); return }
   if ((b = q('.group-song'))) { hsel = +b.dataset.i; renderHist(); return }
   if ((b = q('[data-u]'))) { const u = b.dataset.u, p = C.bdayUse(u); C.save(p); C.onSeed(p); C.toast('Using ' + C.fmtD(u)); return }
