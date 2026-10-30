@@ -121,7 +121,7 @@ const bRender = () => {
 };
 const sRender = () => { const pop = document.getElementById('seedpop'), code = C.enc(C._p), SH = C.seedHist();
   const rows = SH.length ? SH.map(x => `<div class="bp-row${x.code === code ? ' cur' : ''}" data-code="${x.code}"><button class="bp-date" data-a="seed-use">${x.label ? esc(x.label) : x.code}</button><input class="bp-lab" data-a="seed-label" maxlength="24" placeholder="Add a label" value="${esc(x.label || '')}" aria-label="Label for ${x.code}"><button class="btn-reset bp-del" data-a="seed-del" title="Remove" aria-label="Remove saved seed">✕</button></div>`).join('') : '<div class="bp-note">Nothing saved yet.</div>';
-  pop.innerHTML = `<div class="bp-scroll"><div class="bp-sec"><div class="bp-title">Current seed</div><div class="bp-code">${code}</div></div>
+  pop.innerHTML = `<div class="bp-scroll"><div class="bp-sec"><div class="bp-title">Current seed</div><div class="bp-add seed-edit"><input class="field" id="seedcode" value="${code}" spellcheck="false" aria-label="Editable seed code"><button class="btn-reset" data-a="seed-apply">Apply</button></div><div class="bp-note" id="seedmsg">Format: 1.shift.mirror.saturation gain.saturation base.lightness gain.lightness base</div></div>
     <div class="bp-sec"><div class="bp-title">Saved seeds</div><div class="bp-list">${rows}</div><div class="bp-add"><input class="field" id="seedlab" placeholder="Label this seed" maxlength="24"><button class="btn-reset" data-a="seed-save">Save current</button></div></div>
     <div class="bp-sec"><div class="bp-title">Seed settings</div><div class="bp-add"><button class="btn-reset" data-a="universal">Use universal seed</button></div></div></div>`;
 };
@@ -146,6 +146,7 @@ C.seedTag = p => { const el = id => document.getElementById(id), code = C.enc(p)
       if (act === 'seed-use') { const q = C.seedUse(a.closest('.bp-row').dataset.code); if (q) { C.save(q); C.onSeed ? C.onSeed(q) : C.seedTag(q) } }
       else if (act === 'universal') { const q = C.universal(); C.seedSave(q, 'Universal'); C.save(q); C.onSeed ? C.onSeed(q) : C.seedTag(q) }
       else if (act === 'seed-save') { const q = C.seedSave(C._p, seedpop.querySelector('#seedlab').value); C.save(C._p); C.toast('Seed saved' + (q.label ? ' as ' + q.label : '')); sRender() }
+      else if (act === 'seed-apply') { const value = seedpop.querySelector('#seedcode').value, q = C.dec(value); if (!q) { seedpop.querySelector('#seedmsg').textContent = 'Invalid seed. Use a code like 1.137.1.92.123.68.147'; return } C.save(q); C.onSeed ? C.onSeed(q) : C.seedTag(q); C.toast('Seed updated'); sRender() }
       else if (act === 'seed-del') { const code = a.closest('.bp-row').dataset.code; lss(SHK, C.seedHist().filter(x => x.code !== code)); sRender() } });
     seedpop.addEventListener('input', e => { const t = e.target; if (t.dataset.a === 'seed-label') { const code = t.closest('.bp-row').dataset.code, H = C.seedHist(), x = H.find(y => y.code === code); if (x) { x.label = t.value.trim(); lss(SHK, H) } } });
     pop.addEventListener('click', e => { const a = e.target.closest('[data-a]'); if (!a) return; const act = a.dataset.a;

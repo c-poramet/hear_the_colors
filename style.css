@@ -120,7 +120,7 @@ input.field:focus-visible,input[type=text]:focus-visible{outline:none}
 .bp-lab{flex:1;min-width:0;padding:6px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border);color:var(--text-pri);font-family:var(--font-ui);font-size:var(--fs-sm);outline:none;transition:border-color .15s}
 .bp-lab:focus{border-color:var(--border-md)}
 .bp-del{padding:4px 8px}
-.bp-add{display:flex;gap:10px;align-items:center;margin-top:12px}.bp-list{display:flex;flex-direction:column;gap:4px}.bp-code{padding:10px 12px;border:1px solid var(--border);border-radius:7px;background:var(--surface);font:var(--fs-xs) var(--font-mono);color:var(--text-pri);word-break:break-all}
+.bp-add{display:flex;gap:10px;align-items:center;margin-top:12px}.bp-list{display:flex;flex-direction:column;gap:4px}.bp-code{padding:10px 12px;border:1px solid var(--border);border-radius:7px;background:var(--surface);font:var(--fs-xs) var(--font-mono);color:var(--text-pri);word-break:break-all}.seed-edit{margin-top:0}.seed-edit .field{min-width:0}.seed-edit .btn-reset{flex:none}.seed-edit+.bp-note{font-size:var(--fs-2xs);margin-top:8px}
 
 /* ---------- play: spectrum stage ---------- */
 .viz-wrap{flex:1 1 0;min-height:120px;container-type:size;display:flex;align-items:center;justify-content:center}

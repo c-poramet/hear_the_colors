@@ -61,6 +61,7 @@ Older history records that do not contain the new pitch, regularity, or contrast
 - **Dates for this seed**: ranks the dates whose seed gives the closest colours to the current knobs (exact matches first) and shows a match percentage. Respects the Include year switch.
 - **Share**: copy a link or QR code that carries the seed (`#c=1.…`).
 - **Universal seed and saved seeds**: use the Universal seed to return to the shared default calibration independent of a birthday. Save any current seed with a label, then reuse or remove it from the birthday/seed popover. Saved seeds are kept locally in the browser alongside saved birthdays.
+  The editable seed field accepts the encoded form `1.shift.mirror.saturation-gain.saturation-base.lightness-gain.lightness-base`; apply a valid code to change the active seed directly.
 
 ## Seeds and birthdays
 A seed is six numbers (hue shift, mirror, saturation gain/base, lightness gain/base) shown as `SEED 1.…`. The BIRTHDAY tag in the header lists dates that produce the current seed and your saved birthdays. Changing *Include year* re-derives the seed of the birthday in use. Year-less dates are stored as `0000-MM-DD`.
