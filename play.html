@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Song Color Seed – Play</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header><h1>Song Color Seed</h1><nav><a href="index.html">Calibrate</a><a class="on" href="play.html">Play</a></nav></header>
+<main class="grid">
+<section>
+  <canvas id="wheel" width="360" height="360"></canvas>
+  <p class="hint">The trail shows the running colour drifting as more of the song is heard.</p>
+</section>
+<section>
+  <h2>Audio</h2>
+  <input type="file" id="file" accept="audio/*">
+  <p id="status" class="hint">Pick a file. It stays on your device.</p>
+  <audio id="au" controls></audio>
+  <div id="sw"><span id="now"></span></div>
+  <p id="read" class="mono"></p>
+  <h2>Colour over time</h2>
+  <canvas id="strip" width="600" height="60"></canvas>
+  <p class="hint">Each column is the colour of the song up to that moment. Click to seek. Whole-song colour is the far right.</p>
+  <div id="final" class="row"><i id="fsw"></i><span id="ft"></span></div>
+  <p class="hint">Using the seed saved in this browser. <a href="index.html">Change it</a>.</p>
+</section>
+</main>
+<script src="core.js"></script><script src="play.js"></script>
+</body></html>

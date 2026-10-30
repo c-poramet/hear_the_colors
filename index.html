@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Song Color Seed – Calibrate</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header><h1>Song Color Seed</h1><nav><a class="on" href="index.html">Calibrate</a><a href="play.html">Play</a></nav></header>
+<main class="grid">
+<section>
+  <canvas id="wheel" width="360" height="360"></canvas>
+  <p class="hint">Filled dots = where each song lands now. Rings = where you want it. Select a song, then click or drag on the wheel to set its target (lightness comes from the colour picker).</p>
+</section>
+<section>
+  <h2>Songs</h2>
+  <input type="file" id="files" accept="audio/*" multiple>
+  <p id="status" class="hint"></p>
+  <ul id="list"></ul>
+  <button id="fit">Fit seed to targets</button> <button id="reset" class="ghost">Reset</button>
+  <h2>Knobs</h2><div id="knobs"></div>
+  <h2>Seed from date of birth</h2>
+  <input type="date" id="dob"> <button id="gen">Generate</button>
+  <h2>Share</h2>
+  <input id="code" readonly> <button id="copy">Copy link</button>
+  <canvas id="qr"></canvas><div><button id="dl">Download QR</button></div>
+  <input id="imp" placeholder="paste a seed code or link"> <button id="apply">Import</button>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="core.js"></script><script src="app.js"></script>
+</body></html>

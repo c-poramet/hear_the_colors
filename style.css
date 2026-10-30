@@ -1,0 +1,31 @@
+:root{--bg:#111318;--fg:#e8eaf0;--mut:#8b91a1;--card:#1b1e26;--c:#555;font-family:system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(160deg,var(--bg) 55%,color-mix(in srgb,var(--c) 35%,var(--bg)));color:var(--fg);min-height:100vh;transition:background .3s}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid #fff1}
+h1{font-size:18px;margin:0}h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:22px 0 8px}
+nav a{color:var(--mut);text-decoration:none;padding:6px 12px;border-radius:8px;margin-left:4px}
+nav a.on{background:var(--card);color:var(--fg)}
+.grid{display:grid;grid-template-columns:minmax(300px,420px) minmax(300px,1fr);gap:24px;padding:20px;max-width:1000px;margin:auto}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+section{background:var(--card);border-radius:14px;padding:16px;align-self:start}
+canvas{max-width:100%;height:auto;border-radius:10px;display:block;margin:8px auto}
+#wheel{border-radius:50%}
+#qr{background:#fff;width:180px}
+#strip{width:100%;cursor:pointer}
+button,input,audio{font:inherit}
+button{background:#3b82f6;color:#fff;border:0;border-radius:8px;padding:7px 12px;cursor:pointer}
+button.ghost{background:#fff1;color:var(--fg)}
+input[type=text],input:not([type]),input[type=date]{background:#0006;color:var(--fg);border:1px solid #fff2;border-radius:8px;padding:7px;width:100%;margin:4px 0}
+input[type=file]{width:100%;color:var(--mut)}
+label{display:block;font-size:13px;color:var(--mut);margin:8px 0}
+label output{float:right;color:var(--fg)}label input[type=range]{width:100%}
+.row{display:flex;align-items:center;gap:8px}
+.hint{font-size:12px;color:var(--mut)}.mono{font-family:ui-monospace,monospace;white-space:pre-line;font-size:13px}
+ul{list-style:none;padding:0;margin:0 0 10px}
+li{display:flex;align-items:center;gap:8px;padding:6px;border-radius:8px;cursor:pointer}
+li.sel{background:#fff1}li span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+li i,#fsw{width:22px;height:22px;border-radius:6px;flex:none;display:block;border:1px solid #fff4}
+li input[type=color]{width:30px;height:26px;border:0;padding:0;background:none}
+li button{padding:3px 8px}
+audio{width:100%;margin:8px 0}
+#sw{height:110px;border-radius:12px;overflow:hidden;border:1px solid #fff2}#now{display:block;height:100%;background:#444;transition:background .1s}
