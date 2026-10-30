@@ -133,7 +133,7 @@ function drawMap(cv, L) { const g = cv.getContext('2d'), S = cv.width;
   g.fillStyle = 'rgba(255,255,255,.38)'; L.forEach((e, i) => g.fillText(i + 1, 40 + i * bw * 1.15 + bw / 2 - 3, Hh - 2)) }
 function hslBars(L) {
   const rows = [['HUE', c => c.h / 360, c => `hsl(${c.h} ${c.s * 100}% ${c.l * 100}%)`], ['SAT', c => c.s, c => `hsl(${c.h} ${c.s * 100}% ${c.l * 100}%)`], ['LIGHT', c => c.l, c => `hsl(${c.h} ${c.s * 100}% ${c.l * 100}%)`]];
-  return `<div class="compare-hsl">${rows.map(([label, value, color]) => { const base = facts(L[0]).c, gradient = label === 'HUE' ? 'linear-gradient(90deg,#d44,#ddc52d,#45c96b,#36bed1,#5068cf,#bd40c5,#d44)' : label === 'SAT' ? `linear-gradient(90deg,hsl(${base.h} 0% ${base.l * 100}%),hsl(${base.h} 100% ${base.l * 100}%))` : 'linear-gradient(90deg,#000,#fff)'; return `<div class="compare-hsl-row"><span class="compare-hsl-label">${label}</span><div class="compare-hsl-lane"><div class="compare-hsl-track" style="background:${gradient}"></div>${L.map((e, i) => { const c = facts(e).c, v = value(c); return `<button class="compare-hsl-marker${i === hsel ? ' on' : ''}" data-i="${i}" style="left:${Math.round(v * 100)}%" title="${esc(e.name)} · ${Math.round(v * 100)}%">${thumb(e, c, '', i + 1)}<b>${Math.round(v * 100)}%</b></button>` }).join('')}</div></div>` }).join('')}</div>`;
+  return `<div class="compare-hsl">${rows.map(([label, value, color]) => { const base = facts(L[0]).c, meaning = label === 'HUE' ? 'key area' : label === 'SAT' ? 'rhythmic density' : 'timbre brightness', gradient = label === 'HUE' ? 'linear-gradient(90deg,#d44,#ddc52d,#45c96b,#36bed1,#5068cf,#bd40c5,#d44)' : label === 'SAT' ? `linear-gradient(90deg,hsl(${base.h} 0% ${base.l * 100}%),hsl(${base.h} 100% ${base.l * 100}%))` : 'linear-gradient(90deg,#000,#fff)'; return `<div class="compare-hsl-row"><span class="compare-hsl-label">${label}</span><div class="compare-hsl-lane"><div class="compare-hsl-track" style="background:${gradient}"></div>${L.map((e, i) => { const c = facts(e).c, v = value(c); return `<button class="compare-hsl-marker${i === hsel ? ' on' : ''}" data-i="${i}" style="left:${Math.round(v * 100)}%" title="${esc(e.name)} · ${Math.round(v * 100)}%">${thumb(e, c, '', i + 1)}<b>${Math.round(v * 100)}%</b></button>` }).join('')}<span class="compare-hsl-meaning">${meaning}</span></div></div>` }).join('')}</div>`;
 }
 function pairCard(a, b, i, j) { const r = rel(a, b), A = r.A, B = r.B, ca = C.css(A.c), cb = C.css(B.c);
   return `<div class="pair"><div class="ph">${thumb(a, A.c, '', i + 1)}<div class="pp"><b>${r.pct}%</b><span>alike</span></div>${thumb(b, B.c, '', j + 1)}</div>
@@ -142,7 +142,21 @@ function pairCard(a, b, i, j) { const r = rel(a, b), A = r.A, B = r.B, ca = C.cs
   <div class="prow"><span>Saturation</span><div class="bars color-bars"><div>${thumb(a, A.c)}${bar(A.c.s, ca)}</div><div>${thumb(b, B.c)}${bar(B.c.s, cb)}</div></div></div>
   <div class="prow"><span>Light</span><div class="bars color-bars"><div>${thumb(a, A.c)}${bar(A.c.l, ca)}</div><div>${thumb(b, B.c)}${bar(B.c.l, cb)}</div></div></div></div>` }
 function mapView(L, box) { const n = L.slice(0, 8); msel = hsel < n.length ? hsel : -1; pair = pair.map(i => Math.min(i, n.length - 1));
-  const seg = `<div class="compare-controls"><div class="seg wide"><button class="seg-btn${mapMode === 'wheel' ? ' on' : ''}" data-m="wheel">Wheel</button><button class="seg-btn${mapMode === 'bars' ? ' on' : ''}" data-m="bars">HSL bars</button></div><div class="seg wide"><button class="seg-btn${!selectMap ? ' on' : ''}" data-select="0">Triangle</button><button class="seg-btn${selectMap ? ' on' : ''}" data-select="1">Select</button></div>${!selectMap ? `<label class="toggle-row half-toggle"><span class="toggle-label">Only show half</span><label class="toggle-switch"><input type="checkbox" data-half${halfMap ? ' checked' : ''}><span class="toggle-track"></span></label></label>` : ''}</div>`;
+  const actions = $('hist-actions'); actions.innerHTML = `<div class="compare-head-controls"><div class="seg"><button class="seg-btn${mapMode === 'wheel' ? ' on' : ''}" data-m="wheel">Wheel</button><button class="seg-btn${mapMode === 'bars' ? ' on' : ''}" data-m="bars">HSL</button></div><div class="seg"><button class="seg-btn${!selectMap ? ' on' : ''}" data-select="0">Triangle</button><button class="seg-btn${selectMap ? ' on' : ''}" data-select="1">Select</button></div>${!selectMap ? `<label class="head-toggle"><span>½</span><input type="checkbox" data-half${halfMap ? ' checked' : ''}><i></i></label>` : ''}<button class="btn-reset" data-clear>Clear</button></div>`;
+  actions.onclick = e => {
+    const b = e.target.closest('[data-m],[data-select],[data-half],[data-clear]');
+    if (!b) return;
+    if (b.dataset.clear != null) {
+      const clear = b; if (!C.hist().length) return;
+      if (sure) { clearTimeout(sure); sure = 0; clear.textContent = 'Clear'; C.histSave([]); renderHist(); C.toast('History cleared'); return }
+      clear.textContent = 'Sure?'; sure = setTimeout(() => { sure = 0; clear.textContent = 'Clear' }, 2500); return;
+    }
+    if (b.dataset.m) { mapMode = b.dataset.m; lsSet('colorseed.map', mapMode) }
+    else if (b.dataset.select) { selectMap = b.dataset.select === '1'; lsSet('colorseed.select', selectMap ? '1' : '0') }
+    else { halfMap = b.checked; lsSet('colorseed.half', halfMap ? '1' : '0') }
+    renderHist();
+  };
+  const seg = '';
   const scores = []; for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) scores.push(rel(n[i], n[j]).pct); const lo = Math.min(...scores), hi = Math.max(...scores), norm = p => hi === lo ? 1 : (p - lo) / (hi - lo);
   const mx = n.length < 2 ? '' : selectMap ? `<div class="select-pairs"><label>First song<select data-pick="0">${n.map((e, i) => `<option value="${i}"${pair[0] === i ? ' selected' : ''}>${esc(e.name)}</option>`).join('')}</select></label><label>Second song<select data-pick="1">${n.map((e, i) => `<option value="${i}"${pair[1] === i ? ' selected' : ''}>${esc(e.name)}</option>`).join('')}</select></label></div>` : `<div class="mx${halfMap ? ' half' : ''}" style="--n:${n.length}"><span></span>${n.map((e, i) => thumb(e, facts(e).c, '', i + 1)).join('')}${n.map((a, i) => thumb(a, facts(a).c, '', i + 1) + n.map((b, j) => i === j ? `<span class="mc self" style="--c:${C.css(facts(a).c)}"></span>` : (halfMap && j < i ? '<span class="mc blank"></span>' : `<button class="mc${pair[0] === i && pair[1] === j ? ' on' : ''}" data-p="${i},${j}" style="--k:${norm(rel(a, b).pct).toFixed(2)}" title="${esc(a.name)} vs ${esc(b.name)}">${rel(a, b).pct}</button>`)).join('')).join('')}</div>`;
   const chart = mapMode === 'wheel' ? '<canvas id="mapcv" class="map-cv" width="360" height="360"></canvas>' : hslBars(n);
@@ -158,6 +172,7 @@ function bdayView(L, box) { const H = C.bdayHist(), e = L[hsel];
   C.wheel($('bdcv'), R.map((r, i) => bdOff.has(r.k) ? null : { h: r.c.h, s: r.c.s, color: C.css(r.c), label: i + 1 }).filter(Boolean)) }
 function renderHist() { const L = C.hist(), box = $('hist'); hsel = Math.min(hsel, Math.max(0, L.length - 1));
   document.querySelectorAll('#htabs [data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === htab));
+  if (htab !== 'map') { $('hist-actions').innerHTML = '<button class="btn-reset" id="hclr">Clear</button>'; $('hclr').onclick = clearHistory }
   if (!L.length) { box.innerHTML = empty('Songs you play collect here as cards: cover, colour, key, rhythm and brightness at a glance. Compare them and try them under your birthdays.'); return }
   (htab === 'map' ? mapView : htab === 'bday' ? bdayView : songsView)(L, box) }
 $('htabs').onclick = e => { const t = e.target.closest('[data-t]'); if (t) { htab = t.dataset.t; lsSet('colorseed.htab', htab); renderHist() } };
@@ -180,9 +195,9 @@ $('hist').onclick = e => { const q = s => e.target.closest(s), L = C.hist(); let
 $('hist').onchange = e => { const pick = e.target.closest('[data-pick]'); if (!pick) return; pair[+pick.dataset.pick] = +pick.value; renderHist() };
 $('hist').onkeydown = e => { const b = e.target.closest('[data-k]'); if (b && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); b.click() } };
 let sure = 0;
-$('hclr').onclick = () => { const b = $('hclr'); if (!C.hist().length) return;
+function clearHistory() { const b = $('hclr'); if (!C.hist().length) return;
   if (sure) { clearTimeout(sure); sure = 0; b.textContent = 'Clear'; C.histSave([]); renderHist(); C.toast('History cleared'); return }
-  b.textContent = 'Sure?'; sure = setTimeout(() => { sure = 0; b.textContent = 'Clear' }, 2500) };
+  b.textContent = 'Sure?'; sure = setTimeout(() => { sure = 0; b.textContent = 'Clear' }, 2500) }
 
 /* ---------- drawing ---------- */
 function drawStrip(idx) {
