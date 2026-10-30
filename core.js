@@ -27,7 +27,8 @@ C.fromDate = (d, y = C.yearMode()) => { // same day -> same seed. Year ignored (
 
 /* ---------- birthdays ---------- */
 const dmy = iso => iso.slice(8) + '/' + iso.slice(5, 7) + (iso.startsWith('0000') ? '' : '/' + iso.slice(0, 4));
-C.fmtD = dmy; C.dkey = iso => C.yearMode() ? iso : '0000' + iso.slice(4); // year-less dates are stored as 0000-MM-DD
+const longD = iso => { const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']; return +iso.slice(8) + ' ' + months[+iso.slice(5, 7) - 1] + (iso.startsWith('0000') ? '' : ' ' + iso.slice(0, 4)) };
+C.fmtD = dmy; C.fmtLongD = longD; C.dkey = iso => C.yearMode() ? iso : '0000' + iso.slice(4); // year-less dates are stored as 0000-MM-DD
 C.parseDMY = s => { const m = String(s).trim().match(/^(\d{1,2})[\/.\-\s](\d{1,2})(?:[\/.\-\s](\d{4}))?$/); if (!m) return null;
   const d = +m[1], mo = +m[2], y = m[3] ? +m[3] : C.yearMode() ? 0 : 2000; if (!y) return null; const t = new Date(Date.UTC(y, mo - 1, d));
   if (t.getUTCFullYear() !== y || t.getUTCMonth() !== mo - 1 || t.getUTCDate() !== d) return null;
@@ -71,6 +72,18 @@ const bSorted = H => { const k = bSort(), a = H.slice(); // H is stored most-rec
   else if (k === 'old') a.sort((x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : 0);
   else if (k === 'label') a.sort((x, y) => !x.label !== !y.label ? (x.label ? -1 : 1) : (x.label || '').localeCompare(y.label || ''));
   return a };
+C.toggleYearMode = () => {
+  const cur = lsj(BCK, null), was = cur && C._p && cur.code === C.enc(C._p);
+  C.setYearMode(!C.yearMode());
+  if (was) { const p = C.bdayUse(cur.d); C.save(p); C.onSeed ? C.onSeed(p) : C.seedTag(p) }
+  else { C.seedTag(C._p); if (document.getElementById('bpop') && !document.getElementById('bpop').hidden) bRender() }
+};
+C.stepBirthday = direction => {
+  const H = bSorted(C.bdayHist()); if (!H.length) return false;
+  const cur = lsj(BCK, null), index = cur ? H.findIndex(x => x.d === cur.d) : -1;
+  const next = H[(index < 0 ? direction > 0 ? 0 : H.length - 1 : (index + direction + H.length) % H.length)];
+  const p = C.bdayUse(next.d); C.save(p); C.toast('Using ' + dmy(next.d)); C.onSeed ? C.onSeed(p) : C.seedTag(p); return true;
+};
 // header tag: BIRTHDAY · label ×N  (label of the date in use, else of a labelled date matching this seed)
 const tagUpdate = () => { const b = document.getElementById('bday'); if (!b || !C._p) return;
   const code = C.enc(C._p), d = C.bdays(code), cur = lsj(BCK, null), H = C.bdayHist(),
@@ -93,7 +106,8 @@ const bRender = () => {
     <div class="bp-sec"><div class="bp-title">Add a birthday</div><div class="bp-add"><input class="field" id="bpin" placeholder="${C.yearMode() ? 'dd/mm/yyyy' : 'dd/mm, year ignored'}" inputmode="numeric" maxlength="10" aria-label="Birthdate"><button class="btn-reset" data-a="add">Use</button></div><div class="toggle-row"><span class="toggle-label">Include year in seed</span><label class="toggle-switch"><input type="checkbox" data-a="yr" aria-label="Include year in seed"${C.yearMode() ? ' checked' : ''}><span class="toggle-track"></span></label></div></div></div>`;
 };
 C.seedTag = p => { const el = id => document.getElementById(id), code = C.enc(p), b = el('bday'), d = C.bdays(code); C._p = p; C.bdayBuild(() => C.seedTag(C._p));
-  el('tag').textContent = 'SEED ' + code;
+  const cur = lsj(BCK, null), active = cur && cur.code === code ? cur.d : null;
+  el('tag').textContent = 'SEED ' + code + (active ? ' · ' + C.fmtLongD(active) : '');
   let pop = el('bpop');
   if (!pop) { pop = document.createElement('div'); pop.id = 'bpop'; pop.className = 'bday-pop'; pop.hidden = true; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Birthday seeds'); document.body.appendChild(pop);
     const shut = () => { pop.hidden = true; b.setAttribute('aria-expanded', 'false') };

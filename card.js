@@ -12,7 +12,7 @@ const wrap = (g, text, w, max) => { const words = text.split(/\s+/), out = []; l
 const OPT = [['brand', 'Brand & footer'], ['seed', 'Seed code'], ['cover', 'Cover art'], ['title', 'Title'], ['color', 'Colour'], ['length', 'Length'], ['meta', 'Audio metadata'], ['birthday', 'Birthdate'], ['fp', 'Fingerprint'], ['stats', 'Stats']];
 const FPT = [['ring', 'Ring'], ['bars', 'HSL bars'], ['wheel', 'Wheel path']];
 const CONTENT = ['cover', 'title', 'color', 'length', 'fp', 'stats'], CK = 'colorseed.card.v1';
-const getOpts = () => { let o = {}; try { o = JSON.parse(localStorage.getItem(CK)) || {} } catch (e) {} const r = {}; OPT.forEach(([k]) => r[k] = o[k] !== false); r.fpt = FPT.some(f => f[0] === o.fpt) ? o.fpt : 'ring'; return r };
+const getOpts = () => { let o = {}; try { o = JSON.parse(localStorage.getItem(CK)) || {} } catch (e) {} const r = {}; OPT.forEach(([k]) => r[k] = o[k] !== false); r.overtime = o.overtime === true; r.fpt = FPT.some(f => f[0] === o.fpt) ? o.fpt : 'ring'; return r };
 const putOpts = o => { try { localStorage.setItem(CK, JSON.stringify(o)) } catch (e) {} };
 const cardMeta = e => [e.meta && e.meta.artist, e.meta && e.meta.album, e.meta && e.meta.year].filter(Boolean).join(' · ');
 const cardBirthday = () => { const h = C.bdayHist && C.bdayHist(); return h && h[0] ? C.fmtD(h[0].d) : '' };
@@ -79,7 +79,7 @@ C.cardRender = async (e, P, o = getOpts()) => {
       const pt = k => [ox + D / 2 + R * k.s * Math.sin(k.h * Math.PI / 180), oy + D / 2 - R * k.s * Math.cos(k.h * Math.PI / 180)];
       g.save(); g.globalAlpha = .5; g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.clip(); g.drawImage(tmp, ox, oy); g.restore();
       g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.14)'; g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.stroke();
-      g.lineCap = 'round'; g.lineWidth = 7;       if (o.overtime !== false)       if (o.overtime !== false) TR.forEach((k, i) => { if (!i) return; const [a, b] = pt(TR[i - 1]), [c2, d] = pt(k); g.strokeStyle = C.css(k); g.beginPath(); g.moveTo(a, b); g.lineTo(c2, d); g.stroke() });
+      g.lineCap = 'round'; g.lineWidth = 7;             if (o.overtime) TR.forEach((k, i) => { if (!i) return; const [a, b] = pt(TR[i - 1]), [c2, d] = pt(k); g.strokeStyle = C.css(k); g.beginPath(); g.moveTo(a, b); g.lineTo(c2, d); g.stroke() });
       const [sx, sy] = pt(TR[0]), [ex, ey] = pt(last); g.lineWidth = 4; g.strokeStyle = '#f0f0f0'; g.beginPath(); g.arc(sx, sy, 9, 0, TAU); g.stroke(); g.fillStyle = C.css(last); g.beginPath(); g.arc(ex, ey, 14, 0, TAU); g.fill(); g.stroke(); fpCap(g, cx, y, D) } } }
     const rows = [['HUE', k => k.h / 360, k => k.h.toFixed(0) + '°', () => [0, 60, 120, 180, 240, 300, 360].map(h => [h / 360, `hsl(${h} ${last.s * 100}% ${last.l * 100}%)`])],
       ['SAT', k => k.s, k => (k.s * 100).toFixed(0) + '%', () => [[0, `hsl(${last.h} 0% ${last.l * 100}%)`], [1, `hsl(${last.h} 100% ${last.l * 100}%)`]]],
@@ -88,8 +88,8 @@ C.cardRender = async (e, P, o = getOpts()) => {
       rows.forEach(([lab, f, fv, st], r) => { const yy = y + r * RH + 62; T(g, lab, X0, yy + 8, '700 24px ' + MONO, 'rgba(255,255,255,.38)');
         const gr = g.createLinearGradient(tx, 0, tx + tw, 0); st().forEach(([o2, col]) => gr.addColorStop(o2, col)); g.fillStyle = gr; C.rr(g, tx, yy - 9, tw, 18, 9); g.fill(); g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.14)'; g.stroke();
         const px = i => tx + tw * f(TR[i]), py = i => yy - 8 - 44 * (1 - i / (TR.length - 1)); // time runs from the top of the lane down to the bar
-        if (o.overtime !== false) { g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.3)'; g.beginPath(); TR.forEach((k, i) => i ? g.lineTo(px(i), py(i)) : g.moveTo(px(i), py(i))); g.stroke() }
-        if (o.overtime !== false) TR.forEach((k, i) => { g.globalAlpha = .35 + .65 * i / TR.length; g.fillStyle = C.css(k); g.beginPath(); g.arc(px(i), py(i), 5, 0, TAU); g.fill() }); g.globalAlpha = 1;
+        if (o.overtime) { g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.3)'; g.beginPath(); TR.forEach((k, i) => i ? g.lineTo(px(i), py(i)) : g.moveTo(px(i), py(i))); g.stroke() }
+        if (o.overtime) TR.forEach((k, i) => { g.globalAlpha = .35 + .65 * i / TR.length; g.fillStyle = C.css(k); g.beginPath(); g.arc(px(i), py(i), 5, 0, TAU); g.fill() }); g.globalAlpha = 1;
         g.fillStyle = C.css(last); g.lineWidth = 4; g.strokeStyle = '#fff'; g.beginPath(); g.arc(px(TR.length - 1), yy, 14, 0, TAU); g.fill(); g.stroke();
         T(g, fv(last), X0 + CW, yy + 12, '700 34px ' + MONO, '#f0f0f0', 'right') });
       fpCap(g, X0 + CW / 2, y, RH * 3 - 20) } } };

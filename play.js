@@ -71,8 +71,11 @@ $('pp').onclick = () => { if (!fr) return; ac.resume(); au.paused ? au.play() : 
   document.title = au.paused ? 'Color Seed – Play' : '▶ ' + name + ' – Color Seed' }));
 addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  const tag = document.activeElement.tagName; if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-  if (e.code === 'Space' && tag !== 'BUTTON') { e.preventDefault(); $('pp').click() }
+  const tag = document.activeElement.tagName; if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement.isContentEditable) return;
+  if (e.key.toLowerCase() === 'y' && tag !== 'BUTTON') { e.preventDefault(); C.toggleYearMode(); C.toast('Include year ' + (C.yearMode() ? 'on' : 'off')) }
+  else if (e.key === '[' && tag !== 'BUTTON') { e.preventDefault(); C.stepBirthday(-1) }
+  else if (e.key === ']' && tag !== 'BUTTON') { e.preventDefault(); C.stepBirthday(1) }
+  else if (e.code === 'Space' && tag !== 'BUTTON') { e.preventDefault(); $('pp').click() }
   else if (e.key === 'Escape') { cut = null; cutUI() }
   else if (e.key === 'm' || e.key === 'M') $('mute').click();
   else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); setVol(vol + (e.key === 'ArrowUp' ? .05 : -.05), false); lsSet('colorseed.vol', vol) }
@@ -122,7 +125,7 @@ function songCard(e) { const f = facts(e), css = C.css(f.c);
   return `<div class="scard" style="--c:${css}">${thumb(e, f.c, 'lg')}<div class="sc-body"><div class="sc-name">${esc(e.name)}</div><div class="sc-sub">${fmt(e.dur)} · ${e.fp}</div>${hx(f.c)}</div>
   <div class="sc-meters"><div class="mt">${dial(f.a, css, f.key)}<span>Key</span></div><div class="mt">${bar(f.r, css)}<span>Rhythm ${f.rate.toFixed(1)}/s</span></div><div class="mt">${bar(f.c.l, css)}<span>Brightness</span></div></div>
   <div class="sc-act"><button class="btn-reset" data-a="copy">Copy hex</button><button class="btn-reset" data-a="card">Share card</button><button class="btn-reset" data-a="del">Remove</button></div></div>` }
-function songRow(e, i) { const f = facts(e), css = C.css(f.c); return `<button class="srow${i === hsel ? ' on' : ''}" data-i="${i}" style="--c:${css}"><span class="srow-color" data-row-color title="Click to copy ${C.hex(f.c)} · Shift-click to download a colour square" aria-label="${C.hex(f.c)}" style="background:${css}"><b>${C.hex(f.c)}</b></span><span class="srow-info"><span class="srow-card" data-row-card title="Open share card">${thumb(e, f.c)}</span><span><span class="srow-name">${esc(e.name)}</span><span class="srow-meta">${fmt(e.dur)} · ${f.key} · ${f.rate.toFixed(1)}/s</span></span></span></button>` }
+function songRow(e, i) { const f = facts(e), css = C.css(f.c); return `<button class="srow${i === hsel ? ' on' : ''}" data-i="${i}" style="--c:${css}"><span class="srow-color" data-row-color title="Click to copy ${C.hex(f.c)} · Shift-click to download a colour square" aria-label="${C.hex(f.c)}" style="background:${css}"><b>${C.hex(f.c)}</b></span><span class="srow-info"><span class="srow-card" data-row-card title="Open share card">${thumb(e, f.c)}</span><span><span class="srow-name">${esc(e.name)}</span><span class="srow-meta">${fmt(e.dur)} · ${f.key} · ${f.rate.toFixed(1)}/s</span></span></span><span class="srow-remove" data-row-del title="Remove from history" aria-label="Remove ${esc(e.name)}">×</span></button>` }
 function songsView(L, box) { const control = `<div class="view-controls"><span class="hint">Song view</span><div class="seg"><button class="seg-btn${songMode === 'row' ? ' on' : ''}" data-songs="row">Rows</button><button class="seg-btn${songMode === 'card' ? ' on' : ''}" data-songs="card">Cards</button></div></div>`; box.innerHTML = control + (songMode === 'card' ? songCard(L[hsel]) + '<div class="gcards">' + L.map((e, i) => { const c = facts(e).c; return `<button class="gcard${i === hsel ? ' on' : ''}" data-i="${i}">${thumb(e, c)}<span class="gn">${esc(e.name)}</span>${hx(c)}</button>` }).join('') + '</div>' : '<div class="srows">' + L.map(songRow).join('') + '</div>') }
 
 function drawMap(cv, L) { const g = cv.getContext('2d'), S = cv.width;
@@ -132,6 +135,8 @@ function drawMap(cv, L) { const g = cv.getContext('2d'), S = cv.width;
     L.forEach((e, i) => { const c = C.color(e.raw, P), h = Math.max(3, f(c) * (rh - 14)); g.fillStyle = C.css(c); C.rr(g, 40 + i * bw * 1.15, (r + 1) * rh - 4 - h, bw, h, 3); g.fill() }) });
   g.fillStyle = 'rgba(255,255,255,.38)'; L.forEach((e, i) => g.fillText(i + 1, 40 + i * bw * 1.15 + bw / 2 - 3, Hh - 2)) }
 function hslBars(L) {
+  const shown = pair[0] !== pair[1] && L[pair[0]] && L[pair[1]] ? [L[pair[0]], L[pair[1]]] : L;
+  L = shown;
   const rows = [['HUE', c => c.h / 360, c => `hsl(${c.h} ${c.s * 100}% ${c.l * 100}%)`], ['SAT', c => c.s, c => `hsl(${c.h} ${c.s * 100}% ${c.l * 100}%)`], ['LIGHT', c => c.l, c => `hsl(${c.h} ${c.s * 100}% ${c.l * 100}%)`]];
   return `<div class="compare-hsl">${rows.map(([label, value, color]) => { const base = facts(L[0]).c, meaning = label === 'HUE' ? 'key area' : label === 'SAT' ? 'rhythmic density' : 'timbre brightness', gradient = label === 'HUE' ? 'linear-gradient(90deg,#d44,#ddc52d,#45c96b,#36bed1,#5068cf,#bd40c5,#d44)' : label === 'SAT' ? `linear-gradient(90deg,hsl(${base.h} 0% ${base.l * 100}%),hsl(${base.h} 100% ${base.l * 100}%))` : 'linear-gradient(90deg,#000,#fff)'; return `<div class="compare-hsl-row"><span class="compare-hsl-label">${label}</span><div class="compare-hsl-lane"><div class="compare-hsl-track" style="background:${gradient}"></div>${L.map((e, i) => { const c = facts(e).c, v = value(c); return `<button class="compare-hsl-marker${i === hsel ? ' on' : ''}" data-i="${i}" style="left:${Math.round(v * 100)}%" title="${esc(e.name)} · ${Math.round(v * 100)}%">${thumb(e, c, '', i + 1)}<b>${Math.round(v * 100)}%</b></button>` }).join('')}<span class="compare-hsl-meaning">${meaning}</span></div></div>` }).join('')}</div>`;
 }
@@ -188,6 +193,7 @@ $('hist').onclick = e => { const q = s => e.target.closest(s), L = C.hist(); let
     return;
   }
   if ((b = q('[data-row-card]'))) { const row = b.closest('[data-i]'), x = row && L[+row.dataset.i]; if (x) C.card(x, P); return }
+  if ((b = q('[data-row-del]'))) { const row = b.closest('[data-i]'); if (!row) return; L.splice(+row.dataset.i, 1); C.histSave(L); hsel = Math.min(hsel, Math.max(0, L.length - 1)); renderHist(); C.toast('Removed from history'); return }
   if ((b = q('[data-m]'))) { mapMode = b.dataset.m; lsSet('colorseed.map', mapMode) }
   else if ((b = q('[data-songs]'))) { songMode = b.dataset.songs; lsSet('colorseed.songs', songMode) }
   else if ((b = q('[data-select]'))) { selectMap = b.dataset.select === '1'; lsSet('colorseed.select', selectMap ? '1' : '0') }

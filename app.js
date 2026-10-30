@@ -66,6 +66,13 @@ const DOBHINT = $('dobmsg').textContent;
 $('dob').oninput = e => { const v = e.target.value.replace(/\D/g, '').slice(0, 8);
   e.target.value = [v.slice(0, 2), v.slice(2, 4), v.slice(4)].filter(Boolean).join('/') };
 $('dob').onkeydown = e => { if (e.key === 'Enter') $('gen').click() };
+addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = document.activeElement.tagName; if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON' || document.activeElement.isContentEditable) return;
+  if (e.key.toLowerCase() === 'y') { e.preventDefault(); C.toggleYearMode(); $('yr').checked = C.yearMode(); $('dob').placeholder = C.yearMode() ? 'dd/mm/yyyy' : 'dd/mm (year ignored)'; C.toast('Include year ' + (C.yearMode() ? 'on' : 'off')) }
+  else if (e.key === '[') { e.preventDefault(); C.stepBirthday(-1) }
+  else if (e.key === ']') { e.preventDefault(); C.stepBirthday(1) }
+});
 $('gen').onclick = () => { const iso = C.parseDMY($('dob').value);
   if (!iso) { $('dobmsg').textContent = C.yearMode() ? 'Enter a real date as dd/mm/yyyy.' : 'Enter a real day as dd/mm.'; return }
   $('dobmsg').textContent = DOBHINT; P = C.bdayUse(iso); commit(); C.toast('Seed from ' + $('dob').value) };
