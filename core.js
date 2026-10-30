@@ -1,6 +1,6 @@
 (() => {
 const TAU = Math.PI * 2, cl = (v, a, b) => Math.min(b, Math.max(a, v));
-const DEF = { shift: 0, mir: 0, sg: .75, sb: .15, lg: .4, lb: .3 }, UNIVERSAL = { shift: 0, mir: 0, sg: .75, sb: .15, lg: .4, lb: .3 }, KEY = 'colorseed.v1';
+const DEF = { shift: 0, mir: 0, sg: .75, sb: .15, lg: .4, lb: .3 }, UNIVERSAL = { shift: 137, mir: 1, sg: .92, sb: .23, lg: .68, lb: .47 }, KEY = 'colorseed.v1';
 const C = window.C = { DEF, cl };
 
 /* ---------- seed (calibration) ---------- */
@@ -76,6 +76,9 @@ C.rr = (g, x, y, w, h, r) => { r = Math.min(r, w / 2, h / 2); g.beginPath(); g.m
 const bPlace = () => { const pop = document.getElementById('bpop'), r = document.getElementById('bday').getBoundingClientRect(),
     w = Math.min(320, innerWidth - 16), cx = r.left + r.width / 2, left = cl(cx - w / 2, 8, innerWidth - w - 8);
   pop.style.width = w + 'px'; pop.style.left = left + 'px'; pop.style.top = r.bottom + 10 + 'px'; pop.style.setProperty('--cx', cx - left + 'px') };
+const seedPlace = () => { const pop = document.getElementById('seedpop'), r = document.getElementById('tag').getBoundingClientRect(),
+   w = Math.min(360, innerWidth - 16), cx = r.left + r.width / 2, left = cl(cx - w / 2, 8, innerWidth - w - 8);
+  pop.style.width = w + 'px'; pop.style.left = left + 'px'; pop.style.top = r.bottom + 10 + 'px'; pop.style.setProperty('--cx', cx - left + 'px') };
 const BSK = 'colorseed.bday.sort', SORTS = [['recent', 'Recent use'], ['new', 'Date, newest'], ['old', 'Date, oldest'], ['label', 'Label A–Z']];
 const bSort = () => { const v = lsj(BSK, 'recent'); return SORTS.some(x => x[0] === v) ? v : 'recent' };
 const bSorted = H => { const k = bSort(), a = H.slice(); // H is stored most-recently-used first; sort() is stable, so ties keep that order
@@ -112,11 +115,15 @@ const bRender = () => {
     : '<div class="bp-note">This seed does not come from a birthday. Add one below to switch to it.</div>';
   const rows = H.length ? bSorted(H).map(x => `<div class="bp-row${x.d === used ? ' cur' : ''}" data-d="${x.d}"><button class="bp-date" data-a="use" title="Use this birthday">${dmy(x.d)}</button><input class="bp-lab" data-a="label" maxlength="24" placeholder="Add a label" value="${esc(x.label || '')}" aria-label="Label for ${dmy(x.d)}"><button class="btn-reset bp-del" data-a="del" title="Remove" aria-label="Remove ${dmy(x.d)}">✕</button></div>`).join('')
     : '<div class="bp-note">Nothing saved yet. Birthdays you use appear here.</div>';
-  const seedRows = SH.length ? SH.map(x => `<div class="bp-row${x.code === code ? ' cur' : ''}" data-code="${x.code}"><button class="bp-date" data-a="seed-use">${x.label ? esc(x.label) : x.code}</button><input class="bp-lab" data-a="seed-label" maxlength="24" placeholder="Add a label" value="${esc(x.label || '')}" aria-label="Label for ${x.code}"><button class="btn-reset bp-del" data-a="seed-del" title="Remove" aria-label="Remove saved seed">✕</button></div>`).join('') : '<div class="bp-note">Nothing saved yet.</div>';
   pop.innerHTML = `<div class="bp-scroll"><div class="bp-sec"><div class="bp-title">In use</div>${top}</div>
     <div class="bp-sec"><div class="bp-title bp-title-row"><span>History</span><select class="bp-sort" data-a="sort" aria-label="Sort history">${SORTS.map(o => `<option value="${o[0]}"${o[0] === bSort() ? ' selected' : ''}>${o[1]}</option>`).join('')}</select></div>${rows}</div>
-    <div class="bp-sec"><div class="bp-title">Saved seeds</div>${seedRows}<div class="bp-add"><input class="field" id="seedlab" placeholder="Label this seed" maxlength="24"><button class="btn-reset" data-a="seed-save">Save current</button></div><div class="bp-add"><button class="btn-reset" data-a="universal">Use universal seed</button></div></div>
     <div class="bp-sec"><div class="bp-title">Add a birthday</div><div class="bp-add"><input class="field" id="bpin" placeholder="${C.yearMode() ? 'dd/mm/yyyy' : 'dd/mm, year ignored'}" inputmode="numeric" maxlength="10" aria-label="Birthdate"><button class="btn-reset" data-a="add">Use</button></div><div class="toggle-row"><span class="toggle-label">Include year in seed</span><label class="toggle-switch"><input type="checkbox" data-a="yr" aria-label="Include year in seed"${C.yearMode() ? ' checked' : ''}><span class="toggle-track"></span></label></div></div></div>`;
+};
+const sRender = () => { const pop = document.getElementById('seedpop'), code = C.enc(C._p), SH = C.seedHist();
+  const rows = SH.length ? SH.map(x => `<div class="bp-row${x.code === code ? ' cur' : ''}" data-code="${x.code}"><button class="bp-date" data-a="seed-use">${x.label ? esc(x.label) : x.code}</button><input class="bp-lab" data-a="seed-label" maxlength="24" placeholder="Add a label" value="${esc(x.label || '')}" aria-label="Label for ${x.code}"><button class="btn-reset bp-del" data-a="seed-del" title="Remove" aria-label="Remove saved seed">✕</button></div>`).join('') : '<div class="bp-note">Nothing saved yet.</div>';
+  pop.innerHTML = `<div class="bp-scroll"><div class="bp-sec"><div class="bp-title">Current seed</div><div class="bp-code">${code}</div></div>
+    <div class="bp-sec"><div class="bp-title">Saved seeds</div><div class="bp-list">${rows}</div><div class="bp-add"><input class="field" id="seedlab" placeholder="Label this seed" maxlength="24"><button class="btn-reset" data-a="seed-save">Save current</button></div></div>
+    <div class="bp-sec"><div class="bp-title">Seed settings</div><div class="bp-add"><button class="btn-reset" data-a="universal">Use universal seed</button></div></div></div>`;
 };
 C.seedTag = p => { const el = id => document.getElementById(id), code = C.enc(p), b = el('bday'), d = C.bdays(code); C._p = p; C.bdayBuild(() => C.seedTag(C._p));
   C.updateYearIndicator();
@@ -124,24 +131,29 @@ C.seedTag = p => { const el = id => document.getElementById(id), code = C.enc(p)
   el('tag').textContent = 'SEED ' + code + (active ? ' · ' + C.fmtLongD(active) : '');
   let pop = el('bpop');
   if (!pop) { pop = document.createElement('div'); pop.id = 'bpop'; pop.className = 'bday-pop'; pop.hidden = true; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Birthday seeds'); document.body.appendChild(pop);
-    const shut = () => { pop.hidden = true; b.setAttribute('aria-expanded', 'false') };
+    const seedpop = document.createElement('div'); seedpop.id = 'seedpop'; seedpop.className = 'bday-pop seed-pop'; seedpop.hidden = true; seedpop.setAttribute('role', 'dialog'); seedpop.setAttribute('aria-label', 'Saved seeds'); document.body.appendChild(seedpop);
+    const shut = () => { pop.hidden = true; seedpop.hidden = true; b.setAttribute('aria-expanded', 'false'); el('tag').setAttribute('aria-expanded', 'false') };
     b.setAttribute('aria-haspopup', 'dialog'); b.setAttribute('aria-expanded', 'false');
     b.onclick = () => { pop.hidden = !pop.hidden; b.setAttribute('aria-expanded', String(!pop.hidden)); if (!pop.hidden) { bRender(); bPlace() } };
-    addEventListener('click', e => { const path = e.composedPath(); if (!pop.hidden && !path.includes(pop) && !path.includes(b)) shut() });
+    el('tag').setAttribute('role', 'button'); el('tag').setAttribute('tabindex', '0'); el('tag').setAttribute('aria-haspopup', 'dialog'); el('tag').setAttribute('aria-expanded', 'false');
+    el('tag').onclick = () => { seedpop.hidden = !seedpop.hidden; pop.hidden = true; el('tag').setAttribute('aria-expanded', String(!seedpop.hidden)); if (!seedpop.hidden) { sRender(); seedPlace() } };
+    addEventListener('click', e => { const path = e.composedPath(); if ((!pop.hidden && !path.includes(pop) && !path.includes(b)) || (!seedpop.hidden && !path.includes(seedpop) && !path.includes(el('tag')))) shut() });
     addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden) shut() });
     addEventListener('resize', () => { if (!pop.hidden) bPlace() });
+    addEventListener('resize', () => { if (!seedpop.hidden) seedPlace() });
     const use = iso => { const q = C.bdayUse(iso); C.save(q); C.toast('Using ' + dmy(iso)); C.onSeed ? C.onSeed(q) : C.seedTag(q) };
+    seedpop.addEventListener('click', e => { const a = e.target.closest('[data-a]'); if (!a) return; const act = a.dataset.a;
+      if (act === 'seed-use') { const q = C.seedUse(a.closest('.bp-row').dataset.code); if (q) { C.save(q); C.onSeed ? C.onSeed(q) : C.seedTag(q) } }
+      else if (act === 'universal') { const q = C.universal(); C.seedSave(q, 'Universal'); C.save(q); C.onSeed ? C.onSeed(q) : C.seedTag(q) }
+      else if (act === 'seed-save') { const q = C.seedSave(C._p, seedpop.querySelector('#seedlab').value); C.save(C._p); C.toast('Seed saved' + (q.label ? ' as ' + q.label : '')); sRender() }
+      else if (act === 'seed-del') { const code = a.closest('.bp-row').dataset.code; lss(SHK, C.seedHist().filter(x => x.code !== code)); sRender() } });
+    seedpop.addEventListener('input', e => { const t = e.target; if (t.dataset.a === 'seed-label') { const code = t.closest('.bp-row').dataset.code, H = C.seedHist(), x = H.find(y => y.code === code); if (x) { x.label = t.value.trim(); lss(SHK, H) } } });
     pop.addEventListener('click', e => { const a = e.target.closest('[data-a]'); if (!a) return; const act = a.dataset.a;
       if (act === 'use') use(a.dataset.d || a.closest('.bp-row').dataset.d);
-      else if (act === 'seed-use') { const q = C.seedUse(a.closest('.bp-row').dataset.code); if (q) { C.save(q); C.onSeed ? C.onSeed(q) : C.seedTag(q) } }
-      else if (act === 'universal') { const q = C.universal(); C.seedSave(q, 'Universal'); C.save(q); C.onSeed ? C.onSeed(q) : C.seedTag(q) }
-      else if (act === 'seed-save') { const q = C.seedSave(C._p, pop.querySelector('#seedlab').value); C.save(C._p); C.toast('Seed saved' + (q.label ? ' as ' + q.label : '')); bRender() }
-      else if (act === 'seed-del') { const code = a.closest('.bp-row').dataset.code; lss(SHK, C.seedHist().filter(x => x.code !== code)); bRender() }
       else if (act === 'del') { const d = a.closest('.bp-row').dataset.d; lss(BHK, C.bdayHist().filter(x => x.d !== d)); bRender(); tagUpdate() }
       else if (act === 'add') { const iso = C.parseDMY(pop.querySelector('#bpin').value); iso ? use(iso) : C.toast('Enter a real date as dd/mm/yyyy') } });
     pop.addEventListener('input', e => { const t = e.target;
       if (t.dataset.a === 'label') { const d = t.closest('.bp-row').dataset.d, H = C.bdayHist(), x = H.find(y => y.d === d); if (x) { x.label = t.value.trim(); lss(BHK, H); tagUpdate() } }
-      if (t.dataset.a === 'seed-label') { const code = t.closest('.bp-row').dataset.code, H = C.seedHist(), x = H.find(y => y.code === code); if (x) { x.label = t.value.trim(); lss(SHK, H) } }
       if (t.id === 'bpin') { const v = t.value.replace(/\D/g, '').slice(0, 8); t.value = [v.slice(0, 2), v.slice(2, 4), v.slice(4)].filter(Boolean).join('/') } });
     pop.addEventListener('change', e => { const a = e.target.dataset.a; if (a === 'sort') { lss(BSK, e.target.value); bRender() }
       else if (a === 'yr') { const cur = lsj(BCK, null), was = cur && cur.code === C.enc(C._p); C.setYearMode(e.target.checked); if (was) use(cur.d); else { C.seedTag(C._p); bRender() } } });

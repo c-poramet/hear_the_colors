@@ -48,6 +48,7 @@ Older history records that do not contain the new pitch, regularity, or contrast
 - **Cut**: drag across the timeline to get the colour of just that piece. Without Cut, dragging simply seeks.
 - **History** is a picture-first card view with three full-width tabs:
   - *Songs*: the legacy row view is the default, with an optional colour-tinted card view. The selected song includes cover or fingerprint, colour with its hex, key dial, rhythm and brightness meters, copy / palette / share card / remove. Palette generation includes complementary, analogous, triadic, split-complementary, tetradic and monochromatic schemes, uses the active birthday seed, and lets you drag palette kinds into a saved order.
+    Each song card or row also has **Calibrate**, which fits the active seed to that song in place without leaving the Play page.
   - *Compare*: all recent songs on a wheel or as HSL bars, plus a similarity matrix with thumbnails on both axes. The matrix can show only one triangle or switch to two song selectors; compare it using any combination of hue, saturation and lightness, with **All** enabling all three. Its colours are normalized against the loaded comparisons, so the strongest pair is the strongest visible match. The selected pair includes key dials and thumbnail-backed hue, saturation and lightness bars.
   - *Birthdays*: pick a song, then see its colour under each saved birthday as a card. Click a card to show or hide it in the wheel and colour strip; **Use** switches to that birthday.
   Every hex code is shown with a swatch of its colour.

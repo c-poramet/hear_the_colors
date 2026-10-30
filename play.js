@@ -111,8 +111,8 @@ let paletteSong = null, paletteClose = null, htab = lsGet('colorseed.htab', 'son
 if (!/^[hsl]+$/.test(compareMetric) || !compareMetric) compareMetric = 'hsl';
 if (!['songs', 'map', 'bday'].includes(htab)) htab = 'songs';
 const KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯', 'A♭', 'E♭', 'B♭', 'F'], rad = d => d * Math.PI / 180;
-// hue = place on the circle of fifths (key area), saturation = rhythmic density, lightness = timbre brightness
-const facts = e => { const c = C.color(e.raw, P), a = (c.a + 360) % 360; return { c, a, r: e.raw.s0, rate: -5 * Math.log(1 - Math.min(.999, e.raw.s0)), key: KEYS[Math.round(a / 30) % 12] } };
+// hue = pitch-class distribution, saturation = onset regularity, lightness = brightness contrast
+const facts = e => { const c = C.color(e.raw, P), a = (c.a + 360) % 360, r = e.raw.rr == null ? e.raw.s0 : e.raw.rr; return { c, a, r, rate: -5 * Math.log(1 - Math.min(.999, r)), key: KEYS[Math.round(a / 30) % 12] } };
 const rel = (x, y) => { const A = facts(x), B = facts(y), d = Math.abs(A.a - B.a), st = Math.min(d, 360 - d) / 30;
   return { A, B, st, pct: Math.round(100 * (1 - (.5 * st / 6 + .25 * Math.abs(A.c.s - B.c.s) + .25 * Math.abs(A.c.l - B.c.l)))) } };
 const metricPct = (x, y) => {
@@ -185,9 +185,15 @@ function showPalettes(e) {
 
 function songCard(e) { const f = facts(e), css = C.css(f.c);
   return `<div class="scard" style="--c:${css}">${thumb(e, f.c, 'lg')}<div class="sc-body"><div class="sc-name">${esc(e.name)}</div><div class="sc-sub">${fmt(e.dur)} · ${e.fp}</div>${hx(f.c)}</div>
-  <div class="sc-meters"><div class="mt">${dial(f.a, css, f.key)}<span>Key</span></div><div class="mt">${bar(f.r, css)}<span>Rhythm ${f.rate.toFixed(1)}/s</span></div><div class="mt">${bar(f.c.l, css)}<span>Brightness</span></div></div>
-  <div class="sc-act"><button class="btn-reset" data-a="copy">Copy hex</button><button class="btn-reset" data-a="palette">Palette</button><button class="btn-reset" data-a="card">Share card</button><button class="btn-reset" data-a="del">Remove</button></div></div>` }
-function songRow(e, i) { const f = facts(e), css = C.css(f.c); return `<button class="srow${i === hsel ? ' on' : ''}" data-i="${i}" style="--c:${css}"><span class="srow-color" data-row-color title="Click to copy ${C.hex(f.c)} · Shift-click to download a colour square" aria-label="${C.hex(f.c)}" style="background:${css}"><b>${C.hex(f.c)}</b></span><span class="srow-info"><span class="srow-card" data-row-card title="Open share card">${thumb(e, f.c)}</span><span><span class="srow-name">${esc(e.name)}</span><span class="srow-meta">${fmt(e.dur)} · ${f.key} · ${f.rate.toFixed(1)}/s</span></span></span><span class="srow-palette" data-row-palette role="button" tabindex="0" title="Generate colour palettes">Palette</span><span class="srow-remove" data-row-del title="Remove from history" aria-label="Remove ${esc(e.name)}">×</span></button>` }
+  <div class="sc-meters"><div class="mt">${dial(f.a, css, f.key)}<span>Pitch classes</span></div><div class="mt">${bar(f.r, css)}<span>Onset regularity</span></div><div class="mt">${bar(f.c.l, css)}<span>Brightness contrast</span></div></div>
+  <div class="sc-act"><button class="btn-reset" data-a="copy">Copy hex</button><button class="btn-reset" data-a="palette">Palette</button><button class="btn-reset" data-a="calibrate">Calibrate</button><button class="btn-reset" data-a="card">Share card</button><button class="btn-reset" data-a="del">Remove</button></div></div>` }
+function calibrateSong(e) {
+  const raw = e.raw, target = C.color(raw, P), base = C.color(raw, { ...P, shift: 0 }), saturation = raw.rr == null ? raw.s0 : raw.rr, lightness = raw.contrast == null ? raw.l0 : raw.contrast;
+  const shift = (((target.h - base.h) % 360) + 360) % 360;
+  P = { ...P, shift, sg: 1, sb: C.cl(target.s - saturation, -1, 1), lg: 1, lb: C.cl(target.l - lightness, -1, 1) };
+  C.save(P); C.seedTag(P); renderHist(); C.toast('Seed calibrated to this song');
+}
+function songRow(e, i) { const f = facts(e), css = C.css(f.c); return `<button class="srow${i === hsel ? ' on' : ''}" data-i="${i}" style="--c:${css}"><span class="srow-color" data-row-color title="Click to copy ${C.hex(f.c)} · Shift-click to download a colour square" aria-label="${C.hex(f.c)}" style="background:${css}"><b>${C.hex(f.c)}</b></span><span class="srow-info"><span class="srow-card" data-row-card title="Open share card">${thumb(e, f.c)}</span><span><span class="srow-name">${esc(e.name)}</span><span class="srow-meta">${fmt(e.dur)} · ${f.key} · ${f.rate.toFixed(1)}/s</span></span></span><span class="srow-palette" data-row-palette role="button" tabindex="0" title="Generate colour palettes">Palette</span><span class="srow-calibrate" data-row-calibrate role="button" tabindex="0" title="Fit calibration to this colour">Calibrate</span><span class="srow-remove" data-row-del title="Remove from history" aria-label="Remove ${esc(e.name)}">×</span></button>` }
 function songsView(L, box) { const control = `<div class="view-controls"><span class="hint">Song view</span><div class="seg"><button class="seg-btn${songMode === 'row' ? ' on' : ''}" data-songs="row">Rows</button><button class="seg-btn${songMode === 'card' ? ' on' : ''}" data-songs="card">Cards</button></div></div>`; box.innerHTML = control + (songMode === 'card' ? songCard(L[hsel]) + '<div class="gcards">' + L.map((e, i) => { const c = facts(e).c; return `<button class="gcard${i === hsel ? ' on' : ''}" data-i="${i}">${thumb(e, c)}<span class="gn">${esc(e.name)}</span>${hx(c)}</button>` }).join('') + '</div>' : '<div class="srows">' + L.map(songRow).join('') + '</div>') }
 
 function drawMap(cv, L) { const g = cv.getContext('2d'), S = cv.width;
@@ -199,15 +205,15 @@ function drawMap(cv, L) { const g = cv.getContext('2d'), S = cv.width;
 function hslBars(L) {
   const shown = pair[0] !== pair[1] && L[pair[0]] && L[pair[1]] ? [L[pair[0]], L[pair[1]]] : L;
   L = shown;
-  const rows = [['HUE', c => c.h / 360, c => `hsl(${c.h} ${c.s * 100}% ${c.l * 100}%)`], ['SAT', c => c.s, c => `hsl(${c.h} ${c.s * 100}% ${c.l * 100}%)`], ['LIGHT', c => c.l, c => `hsl(${c.h} ${c.s * 100}% ${c.l * 100}%)`]];
-  return `<div class="compare-hsl">${rows.map(([label, value, color]) => { const base = facts(L[0]).c, meaning = label === 'HUE' ? 'key area' : label === 'SAT' ? 'rhythmic density' : 'timbre brightness', gradient = label === 'HUE' ? 'linear-gradient(90deg,#d44,#ddc52d,#45c96b,#36bed1,#5068cf,#bd40c5,#d44)' : label === 'SAT' ? `linear-gradient(90deg,hsl(${base.h} 0% ${base.l * 100}%),hsl(${base.h} 100% ${base.l * 100}%))` : 'linear-gradient(90deg,#000,#fff)'; return `<div class="compare-hsl-row"><span class="compare-hsl-label">${label}</span><div class="compare-hsl-lane"><div class="compare-hsl-track" style="background:${gradient}"></div>${L.map((e, i) => { const c = facts(e).c, v = value(c); return `<button class="compare-hsl-marker${i === hsel ? ' on' : ''}" data-i="${i}" style="left:${Math.round(v * 100)}%" title="${esc(e.name)} · ${Math.round(v * 100)}%">${thumb(e, c, '', i + 1)}<b>${Math.round(v * 100)}%</b></button>` }).join('')}<span class="compare-hsl-meaning">${meaning}</span></div></div>` }).join('')}</div>`;
+  const rows = [['HUE', c => c.h / 360], ['SAT', c => c.s], ['LIGHT', c => c.l]];
+  return `<div class="compare-hsl">${rows.map(([label, value]) => { const base = facts(L[0]).c, meaning = label === 'HUE' ? 'pitch-class distribution' : label === 'SAT' ? 'onset-timing regularity' : 'brightness contrast over time', gradient = label === 'HUE' ? 'linear-gradient(90deg,#d44,#ddc52d,#45c96b,#36bed1,#5068cf,#bd40c5,#d44)' : label === 'SAT' ? `linear-gradient(90deg,hsl(${base.h} 0% ${base.l * 100}%),hsl(${base.h} 100% ${base.l * 100}%))` : 'linear-gradient(90deg,#000,#fff)'; return `<div class="compare-hsl-row"><span class="compare-hsl-label">${label}</span><div class="compare-hsl-lane"><div class="compare-hsl-track" style="background:${gradient}"></div>${L.map((e, i) => { const c = facts(e).c, v = value(c); return `<button class="compare-hsl-marker${i === hsel ? ' on' : ''}" data-i="${i}" style="left:${Math.round(v * 100)}%" title="${esc(e.name)} · ${Math.round(v * 100)}%">${thumb(e, c, '', i + 1)}<b>${Math.round(v * 100)}%</b></button>` }).join('')}<span class="compare-hsl-meaning">${meaning}</span></div></div>` }).join('')}</div>`;
 }
 function pairCard(a, b, i, j) { const r = rel(a, b), A = r.A, B = r.B, ca = C.css(A.c), cb = C.css(B.c);
   return `<div class="pair"><div class="ph">${thumb(a, A.c, '', i + 1)}<div class="pp"><b>${r.pct}%</b><span>alike</span></div>${thumb(b, B.c, '', j + 1)}</div>
-  <div class="prow"><span>Key</span><div class="pd">${dial(A.a, ca, A.key)}<em>${r.st < .5 ? 'same key area' : Math.round(r.st) + (Math.round(r.st) === 1 ? ' fifth apart' : ' fifths apart')}</em>${dial(B.a, cb, B.key)}</div></div>
+  <div class="prow"><span>Pitch centre</span><div class="pd">${dial(A.a, ca, A.key)}<em>${r.st < .5 ? 'same pitch area' : Math.round(r.st) + (Math.round(r.st) === 1 ? ' fifth apart' : ' fifths apart')}</em>${dial(B.a, cb, B.key)}</div></div>
   <div class="prow"><span>Hue</span><div class="bars color-bars"><div>${thumb(a, A.c)}${bar(A.c.h / 360, ca)}</div><div>${thumb(b, B.c)}${bar(B.c.h / 360, cb)}</div></div></div>
   <div class="prow"><span>Saturation</span><div class="bars color-bars"><div>${thumb(a, A.c)}${bar(A.c.s, ca)}</div><div>${thumb(b, B.c)}${bar(B.c.s, cb)}</div></div></div>
-  <div class="prow"><span>Light</span><div class="bars color-bars"><div>${thumb(a, A.c)}${bar(A.c.l, ca)}</div><div>${thumb(b, B.c)}${bar(B.c.l, cb)}</div></div></div></div>` }
+  <div class="prow"><span>Brightness contrast</span><div class="bars color-bars"><div>${thumb(a, A.c)}${bar(A.c.l, ca)}</div><div>${thumb(b, B.c)}${bar(B.c.l, cb)}</div></div></div></div>` }
 function mapView(L, box) { const n = L.slice(0, 8); msel = hsel < n.length ? hsel : -1; pair = pair.map(i => Math.min(i, n.length - 1));
   const actions = $('hist-actions'); actions.innerHTML = `<div class="compare-head-controls"><div class="seg"><button class="seg-btn${mapMode === 'wheel' ? ' on' : ''}" data-m="wheel">Wheel</button><button class="seg-btn${mapMode === 'bars' ? ' on' : ''}" data-m="bars">HSL</button></div><div class="seg"><button class="seg-btn${!selectMap ? ' on' : ''}" data-select="0">Triangle</button><button class="seg-btn${selectMap ? ' on' : ''}" data-select="1">Select</button></div><label class="head-toggle${selectMap ? ' disabled' : ''}" title="${selectMap ? 'Only available in Triangle mode' : 'Show only half of the comparison triangle'}"><span>Half</span><input type="checkbox" data-half${halfMap ? ' checked' : ''}${selectMap ? ' disabled' : ''}><i></i></label><button class="btn-reset" data-clear>Clear</button><button class="btn-reset" id="himport">Import</button><button class="btn-reset" id="hexport">Export</button><input type="file" id="hfile" accept="application/json,.json" hidden></div>`;
   actions.onclick = e => {
@@ -263,6 +269,7 @@ $('hist').onclick = e => { const q = s => e.target.closest(s), L = C.hist(); let
   }
   if ((b = q('[data-row-card]'))) { const row = b.closest('[data-i]'), x = row && L[+row.dataset.i]; if (x) C.card(x, P); return }
   if ((b = q('[data-row-palette]'))) { const row = b.closest('[data-i]'), x = row && L[+row.dataset.i]; if (x) showPalettes(x); return }
+  if ((b = q('[data-row-calibrate]'))) { const row = b.closest('[data-i]'), x = row && L[+row.dataset.i]; if (x) calibrateSong(x); return }
   if ((b = q('[data-row-del]'))) { const row = b.closest('[data-i]'); if (!row) return; L.splice(+row.dataset.i, 1); C.histSave(L); hsel = Math.min(hsel, Math.max(0, L.length - 1)); renderHist(); C.toast('Removed from history'); return }
   if ((b = q('[data-m]'))) { mapMode = b.dataset.m; lsSet('colorseed.map', mapMode) }
   else if ((b = q('[data-songs]'))) { songMode = b.dataset.songs; lsSet('colorseed.songs', songMode) }
@@ -278,6 +285,7 @@ $('hist').onclick = e => { const q = s => e.target.closest(s), L = C.hist(); let
     const selected = L[hsel]; if (!selected) return;
     if (a === 'copy') { const hex = C.hex(C.color(selected.raw, P)); C.copy(hex).then(() => C.toast('Copied ' + hex)); return }
     if (a === 'palette') { showPalettes(selected); return }
+    if (a === 'calibrate') { calibrateSong(selected); return }
     if (a === 'card') { C.card(selected, P); return }
     L.splice(hsel, 1); C.histSave(L); hsel = 0 }
   else if ((b = q('[data-p]'))) pair = b.dataset.p.split(',').map(Number);
@@ -359,9 +367,9 @@ function drawViz(t, live) {
 function frame(t) {
   requestAnimationFrame(frame);
   const dt = Math.min(64, t - lastT || 16); lastT = t;
-  let c = { h: 0, s: 0, l: .42 }, rate = 0, trail = [], idx = 0;
+  let c = { h: 0, s: 0, l: .42 }, rate = 0, regularity = 0, trail = [], idx = 0;
   if (fr) {
-    idx = Math.min(fr.n, Math.floor(au.currentTime / fr.dt)); const s = C.sum(fr, 0, Math.max(1, idx)); c = C.color(s, P); rate = s.rate;
+    idx = Math.min(fr.n, Math.floor(au.currentTime / fr.dt)); const s = C.sum(fr, 0, Math.max(1, idx)); c = C.color(s, P); rate = s.rate; regularity = s.rr;
     const step = Math.max(1, Math.floor(1 / fr.dt));
     for (let j = step; j <= idx; j += step) { const k = C.color(C.sum(fr, 0, j), P); trail.push([k.h, k.s]) }
   }
@@ -369,7 +377,7 @@ function frame(t) {
   cs = { h: (cs.h + dh * k + 360) % 360, s: cs.s + (c.s - cs.s) * k, l: cs.l + (c.l - cs.l) * k };
   mt += ((hsl ? 1 : 0) - mt) * (1 - Math.exp(-dt / 90));
   if (fr) {
-    $('sH').textContent = cs.h.toFixed(0) + '°'; $('sS').textContent = (cs.s * 100).toFixed(0) + '%'; $('sL').textContent = (cs.l * 100).toFixed(0) + '%'; $('sR').textContent = rate.toFixed(1);
+    $('sH').textContent = cs.h.toFixed(0) + '°'; $('sS').textContent = (cs.s * 100).toFixed(0) + '%'; $('sL').textContent = (cs.l * 100).toFixed(0) + '%'; $('sR').textContent = (regularity * 100).toFixed(0) + '%';
     $('nhex').textContent = C.hex(cs); $('ncol').style.background = C.css(cs);
     $('time').textContent = fmt(au.currentTime) + ' / ' + fmt(au.duration || 0);
     drawStrip(idx);
