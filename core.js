@@ -1,6 +1,6 @@
 (() => {
 const TAU = Math.PI * 2, cl = (v, a, b) => Math.min(b, Math.max(a, v));
-const DEF = { shift: 0, mir: 0, sg: .75, sb: .15, lg: .4, lb: .3 }, KEY = 'colorseed.v1';
+const DEF = { shift: 0, mir: 0, sg: .75, sb: .15, lg: .4, lb: .3 }, UNIVERSAL = { shift: 0, mir: 0, sg: .75, sb: .15, lg: .4, lb: .3 }, KEY = 'colorseed.v1';
 const C = window.C = { DEF, cl };
 
 /* ---------- seed (calibration) ---------- */
@@ -53,10 +53,14 @@ C.nearDates = (p, y, cb, n = 12) => { const T = C.probe(p), out = [], a = Date.U
       out.push({ d, dist: Q.reduce((s, q, j) => s + Math.hypot(q[0] - T[j][0], q[1] - T[j][1], q[2] - T[j][2]), 0) / Q.length }) }
     if (i <= z) setTimeout(step); else { out.sort((u, v) => u.dist - v.dist); cb(out.slice(0, n).map(x => ({ d: x.d, pct: Math.round(Math.max(0, 1 - x.dist / .8) * 100) }))) } };
   step() };
-const BHK = 'colorseed.bdays.v1', BCK = 'colorseed.bday.cur';
+const BHK = 'colorseed.bdays.v1', BCK = 'colorseed.bday.cur', SHK = 'colorseed.seeds.v1', SCK = 'colorseed.seed.cur';
 const lsj = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch (e) { return d } }, lss = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch (e) {} };
 const esc = s => String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 C.bdayHist = () => lsj(BHK, []);
+C.seedHist = () => lsj(SHK, []);
+C.seedUse = code => { const p = C.dec(code); if (!p) return null; const H = C.seedHist(), i = H.findIndex(x => x.code === code), e = i >= 0 ? H.splice(i, 1)[0] : { code, label: '' }; H.unshift(e); lss(SHK, H.slice(0, 30)); lss(SCK, { code }); return p };
+C.seedSave = (p, label = '') => { const code = C.enc(p), H = C.seedHist(), i = H.findIndex(x => x.code === code), e = i >= 0 ? H.splice(i, 1)[0] : { code, label: '' }; if (label.trim()) e.label = label.trim().slice(0, 24); H.unshift(e); lss(SHK, H.slice(0, 30)); lss(SCK, { code }); return e };
+C.universal = () => C.dec(C.enc(UNIVERSAL));
 C.bdayUse = iso => { const p = C.fromDate(iso), H = C.bdayHist(), i = H.findIndex(x => x.d === iso), e = i >= 0 ? H.splice(i, 1)[0] : { d: iso, label: '' };
   H.unshift(e); lss(BHK, H.slice(0, 30)); lss(BCK, { d: iso, code: C.enc(p) }); return p };
 
@@ -99,7 +103,7 @@ const tagUpdate = () => { const b = document.getElementById('bday'); if (!b || !
   b.textContent = 'BIRTHDAY' + (lab ? ' · ' + lab : '') + (d.length > 1 ? ' ×' + d.length : '');
   b.title = hit ? 'Birthday ' + dmy(hit.d) + (lab ? ' – ' + lab : '') : b.classList.contains('on') ? 'This seed comes from a birthday' : 'Birthday seeds' };
 const bRender = () => {
-  const code = C.enc(C._p), cur = lsj(BCK, null), H = C.bdayHist(), m = C.bdays(code), used = cur && cur.code === code ? cur.d : null, pop = document.getElementById('bpop');
+  const code = C.enc(C._p), cur = lsj(BCK, null), H = C.bdayHist(), SH = C.seedHist(), m = C.bdays(code), used = cur && cur.code === code ? cur.d : null, pop = document.getElementById('bpop');
   const chips = l => `<div class="bp-chips">${l.slice(0, 12).map(x => `<button class="bp-chip" data-a="use" data-d="${x}">${dmy(x)}</button>`).join('')}</div>` + (l.length > 12 ? `<div class="bp-note">+${l.length - 12} more</div>` : '');
   const lab = H.find(x => x.d === used), others = m.filter(x => x !== (used && C.dkey(used)));
   const top = used ? `<div class="bp-cur"><span class="bp-date">${dmy(used)}</span><span class="bp-lab-cur">${lab && lab.label ? esc(lab.label) : 'in use'}</span></div>`
@@ -108,8 +112,10 @@ const bRender = () => {
     : '<div class="bp-note">This seed does not come from a birthday. Add one below to switch to it.</div>';
   const rows = H.length ? bSorted(H).map(x => `<div class="bp-row${x.d === used ? ' cur' : ''}" data-d="${x.d}"><button class="bp-date" data-a="use" title="Use this birthday">${dmy(x.d)}</button><input class="bp-lab" data-a="label" maxlength="24" placeholder="Add a label" value="${esc(x.label || '')}" aria-label="Label for ${dmy(x.d)}"><button class="btn-reset bp-del" data-a="del" title="Remove" aria-label="Remove ${dmy(x.d)}">✕</button></div>`).join('')
     : '<div class="bp-note">Nothing saved yet. Birthdays you use appear here.</div>';
+  const seedRows = SH.length ? SH.map(x => `<div class="bp-row${x.code === code ? ' cur' : ''}" data-code="${x.code}"><button class="bp-date" data-a="seed-use">${x.label ? esc(x.label) : x.code}</button><input class="bp-lab" data-a="seed-label" maxlength="24" placeholder="Add a label" value="${esc(x.label || '')}" aria-label="Label for ${x.code}"><button class="btn-reset bp-del" data-a="seed-del" title="Remove" aria-label="Remove saved seed">✕</button></div>`).join('') : '<div class="bp-note">Nothing saved yet.</div>';
   pop.innerHTML = `<div class="bp-scroll"><div class="bp-sec"><div class="bp-title">In use</div>${top}</div>
     <div class="bp-sec"><div class="bp-title bp-title-row"><span>History</span><select class="bp-sort" data-a="sort" aria-label="Sort history">${SORTS.map(o => `<option value="${o[0]}"${o[0] === bSort() ? ' selected' : ''}>${o[1]}</option>`).join('')}</select></div>${rows}</div>
+    <div class="bp-sec"><div class="bp-title">Saved seeds</div>${seedRows}<div class="bp-add"><input class="field" id="seedlab" placeholder="Label this seed" maxlength="24"><button class="btn-reset" data-a="seed-save">Save current</button></div><div class="bp-add"><button class="btn-reset" data-a="universal">Use universal seed</button></div></div>
     <div class="bp-sec"><div class="bp-title">Add a birthday</div><div class="bp-add"><input class="field" id="bpin" placeholder="${C.yearMode() ? 'dd/mm/yyyy' : 'dd/mm, year ignored'}" inputmode="numeric" maxlength="10" aria-label="Birthdate"><button class="btn-reset" data-a="add">Use</button></div><div class="toggle-row"><span class="toggle-label">Include year in seed</span><label class="toggle-switch"><input type="checkbox" data-a="yr" aria-label="Include year in seed"${C.yearMode() ? ' checked' : ''}><span class="toggle-track"></span></label></div></div></div>`;
 };
 C.seedTag = p => { const el = id => document.getElementById(id), code = C.enc(p), b = el('bday'), d = C.bdays(code); C._p = p; C.bdayBuild(() => C.seedTag(C._p));
@@ -127,10 +133,15 @@ C.seedTag = p => { const el = id => document.getElementById(id), code = C.enc(p)
     const use = iso => { const q = C.bdayUse(iso); C.save(q); C.toast('Using ' + dmy(iso)); C.onSeed ? C.onSeed(q) : C.seedTag(q) };
     pop.addEventListener('click', e => { const a = e.target.closest('[data-a]'); if (!a) return; const act = a.dataset.a;
       if (act === 'use') use(a.dataset.d || a.closest('.bp-row').dataset.d);
+      else if (act === 'seed-use') { const q = C.seedUse(a.closest('.bp-row').dataset.code); if (q) { C.save(q); C.onSeed ? C.onSeed(q) : C.seedTag(q) } }
+      else if (act === 'universal') { const q = C.universal(); C.seedSave(q, 'Universal'); C.save(q); C.onSeed ? C.onSeed(q) : C.seedTag(q) }
+      else if (act === 'seed-save') { const q = C.seedSave(C._p, pop.querySelector('#seedlab').value); C.save(C._p); C.toast('Seed saved' + (q.label ? ' as ' + q.label : '')); bRender() }
+      else if (act === 'seed-del') { const code = a.closest('.bp-row').dataset.code; lss(SHK, C.seedHist().filter(x => x.code !== code)); bRender() }
       else if (act === 'del') { const d = a.closest('.bp-row').dataset.d; lss(BHK, C.bdayHist().filter(x => x.d !== d)); bRender(); tagUpdate() }
       else if (act === 'add') { const iso = C.parseDMY(pop.querySelector('#bpin').value); iso ? use(iso) : C.toast('Enter a real date as dd/mm/yyyy') } });
     pop.addEventListener('input', e => { const t = e.target;
       if (t.dataset.a === 'label') { const d = t.closest('.bp-row').dataset.d, H = C.bdayHist(), x = H.find(y => y.d === d); if (x) { x.label = t.value.trim(); lss(BHK, H); tagUpdate() } }
+      if (t.dataset.a === 'seed-label') { const code = t.closest('.bp-row').dataset.code, H = C.seedHist(), x = H.find(y => y.code === code); if (x) { x.label = t.value.trim(); lss(SHK, H) } }
       if (t.id === 'bpin') { const v = t.value.replace(/\D/g, '').slice(0, 8); t.value = [v.slice(0, 2), v.slice(2, 4), v.slice(4)].filter(Boolean).join('/') } });
     pop.addEventListener('change', e => { const a = e.target.dataset.a; if (a === 'sort') { lss(BSK, e.target.value); bRender() }
       else if (a === 'yr') { const cur = lsj(BCK, null), was = cur && cur.code === C.enc(C._p); C.setYearMode(e.target.checked); if (was) use(cur.d); else { C.seedTag(C._p); bRender() } } });

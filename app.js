@@ -77,6 +77,8 @@ $('gen').onclick = () => { const iso = C.parseDMY($('dob').value);
   if (!iso) { $('dobmsg').textContent = C.yearMode() ? 'Enter a real date as dd/mm/yyyy.' : 'Enter a real day as dd/mm.'; return }
   $('dobmsg').textContent = DOBHINT; P = C.bdayUse(iso); commit(); C.toast('Seed from ' + $('dob').value) };
 C.onSeed = p => { P = p; commit() };
+$('universal').onclick = () => { P = C.universal(); C.seedSave(P, 'Universal'); commit(); C.toast('Universal seed in use') };
+$('save-seed').onclick = () => { const label = prompt('Label this seed'); if (label !== null) { C.seedSave(P, label); C.toast('Seed saved') } };
 $('copy').onclick = () => C.copy($('code').value).then(() => C.toast('Link copied'));
 $('dl').onclick = () => $('qr').toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'seed-' + C.enc(P) + '.png'; a.click() });
 $('apply').onclick = () => { const m = $('imp').value.match(/c=([\d.]+)/), p = C.dec(m ? m[1] : $('imp').value);

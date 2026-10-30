@@ -59,6 +59,7 @@ Older history records that do not contain the new pitch, regularity, or contrast
 - **Seed from date**: same day, same seed. By default the **year is ignored**: the 366 calendar days get evenly spaced hue shifts (never more than 1° apart) and the other knobs follow a low-discrepancy sequence, so neighbouring days differ as much as possible and every day has its own seed. Switch on **Include year** to give every full date its own seed (dates since 1970, matching earlier versions).
 - **Dates for this seed**: ranks the dates whose seed gives the closest colours to the current knobs (exact matches first) and shows a match percentage. Respects the Include year switch.
 - **Share**: copy a link or QR code that carries the seed (`#c=1.…`).
+- **Universal seed and saved seeds**: use the Universal seed to return to the shared default calibration independent of a birthday. Save any current seed with a label, then reuse or remove it from the birthday/seed popover. Saved seeds are kept locally in the browser alongside saved birthdays.
 
 ## Seeds and birthdays
 A seed is six numbers (hue shift, mirror, saturation gain/base, lightness gain/base) shown as `SEED 1.…`. The BIRTHDAY tag in the header lists dates that produce the current seed and your saved birthdays. Changing *Include year* re-derives the seed of the birthday in use. Year-less dates are stored as `0000-MM-DD`.
