@@ -17,13 +17,10 @@ C.dec = s => {
     lg: cl(n[4] / 100, 0, 1), lb: cl((n[5] - 100) / 100, -1, 1) };
 };
 C.fromHash = () => { const m = location.hash.match(/c=([\d.]+)/), p = m && C.dec(m[1]); if (p) C.save(p); return p };
-C.fromDate = d => { // same date -> same seed
-  let h = 1779033703 ^ d.length;
-  for (let i = 0; i < d.length; i++) { h = Math.imul(h ^ d.charCodeAt(i), 3432918353); h = h << 13 | h >>> 19 }
-  let a = h;
-  const r = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296 };
-  r(); r();
-  return C.dec(C.enc({ shift: Math.floor(r() * 360), mir: r() < .5 ? 1 : 0, sg: .55 + r() * .4, sb: .05 + r() * .2, lg: .3 + r() * .25, lb: .2 + r() * .2 }));
+C.fromDate = d => { // same date -> same seed; consecutive days are spread as far apart as possible
+  const n = Math.floor(Date.parse(d + 'T00:00:00Z') / 864e5), f = a => { const v = n * a; return v - Math.floor(v) };
+  const [u, v, w, x, y] = [f(.8566748838545029), f(.7338918566271260), f(.6287067210378087), f(.5385972572236101), f(.4614027427763898)];
+  return C.dec(C.enc({ shift: u * 360, mir: f(.3819660112501051) > .5 ? 1 : 0, sg: .4 + v * .6, sb: w * .3, lg: .25 + x * .35, lb: .12 + y * .28 }));
 };
 
 /* ---------- colour ---------- */
@@ -54,22 +51,23 @@ C.analyze = async (buf, prog) => {
   const n = Math.max(1, Math.floor((buf.length - N) / H) + 1), dt = H / sr;
   const hx = new Float32Array(n), hy = new Float32Array(n), lf = new Float32Array(n), fx = new Float32Array(n), sil = new Uint8Array(n), on = new Uint8Array(n);
   const b40 = Math.ceil(40 * N / sr), lo = Math.ceil(55 * N / sr), hi = Math.floor(2000 * N / sr), top = Math.min(N / 2 - 1, Math.floor(8000 * N / sr));
-  const cA = new Float64Array(N / 2), sA = new Float64Array(N / 2);
-  for (let k = lo; k <= hi; k++) { const pc = ((Math.round(69 + 12 * Math.log2(k * sr / N / 440)) % 12) + 12) % 12, ang = (pc * 7 % 12) * 30 * Math.PI / 180; cA[k] = Math.cos(ang); sA[k] = Math.sin(ang) }
+  const cA = new Float64Array(N / 2), sA = new Float64Array(N / 2), pk = new Uint8Array(N / 2), cv = new Float64Array(12), g12 = new Float64Array(12);
+  for (let k = lo; k <= hi; k++) { const pc = ((Math.round(69 + 12 * Math.log2(k * sr / N / 440)) % 12) + 12) % 12, ang = (pc * 7 % 12) * 30 * Math.PI / 180; cA[k] = Math.cos(ang); sA[k] = Math.sin(ang); pk[k] = pc }
   const prev = new Float32Array(N / 2), l40 = Math.log2(40), span = Math.log2(8000) - l40;
   for (let i = 0; i < n; i++) {
     let e = 0; im.fill(0);
     for (let j = 0; j < N; j++) { let x = 0; for (let c = 0; c < ch; c++) x += d[c][i * H + j] || 0; x /= ch; e += x * x; re[rev[j]] = x * win[j] }
     fft();
-    let X = 0, Y = 0, cen = 0, cm = 0, fl = 0;
+    let X = 0, Y = 0, cen = 0, cm = 0, fl = 0; cv.fill(0);
     for (let k = b40; k <= top; k++) {
       const m = Math.hypot(re[k], im[k]), q = Math.sqrt(m), v = Math.log1p(m);
-      if (k >= lo && k <= hi) { X += q * cA[k]; Y += q * sA[k] }
+      if (k >= lo && k <= hi) { X += q * cA[k]; Y += q * sA[k]; cv[pk[k]] += q }
       cen += m * Math.log2(k * sr / N); cm += m; fl += Math.max(0, v - prev[k]); prev[k] = v;
     }
     const g = Math.hypot(X, Y) || 1; hx[i] = X / g; hy[i] = Y / g; fx[i] = fl;
     lf[i] = cm ? cl(((cen / cm - l40) / span - .35) / .45, 0, 1) : .5;
     sil[i] = Math.sqrt(e / N) < .003 ? 1 : 0;
+    if (!sil[i]) { const z = cv.reduce((a, b) => a + b) || 1; for (let p = 0; p < 12; p++) g12[p] += cv[p] / z }
     if (i % 150 === 0) { prog && prog(i / n); await new Promise(r => setTimeout(r)) }
   }
   let mx = 1e-9; for (let i = 0; i < n; i++) mx = Math.max(mx, fx[i]);
@@ -79,7 +77,7 @@ C.analyze = async (buf, prog) => {
   const cx = new Float64Array(n + 1), cy = new Float64Array(n + 1), cL = new Float64Array(n + 1), cn = new Float64Array(n + 1), co = new Float64Array(n + 1);
   for (let i = 0; i < n; i++) { const s = !sil[i];
     cx[i + 1] = cx[i] + (s ? hx[i] : 0); cy[i + 1] = cy[i] + (s ? hy[i] : 0); cL[i + 1] = cL[i] + (s ? lf[i] : 0); cn[i + 1] = cn[i] + (s ? 1 : 0); co[i + 1] = co[i] + on[i] }
-  return { n, dt, cx, cy, cl: cL, cn, co };
+  return { n, dt, cx, cy, cl: cL, cn, co, lf, on, sil, g12 };
 };
 // averages over sections [a,b): any slice of a song gets its own colour in O(1)
 C.sum = (fr, a = 0, b = fr.n) => { const n = fr.cn[b] - fr.cn[a], t = (b - a) * fr.dt || 1, rate = (fr.co[b] - fr.co[a]) / t;
@@ -106,6 +104,38 @@ C.wheel = (cv, items) => {
 };
 C.wheelPos = (cv, e) => { const r = cv.getBoundingClientRect(), S = cv.width, k = S / r.width, dx = (e.clientX - r.left) * k - S / 2, dy = (e.clientY - r.top) * k - S / 2;
   return { h: (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360, s: cl(Math.hypot(dx, dy) / (S / 2 - 16), 0, 1) } };
+
+/* ---------- fuzzy fingerprint: similar songs differ in only a few of the 64 bits ---------- */
+const SEG = 16;
+C.contour = fr => { const L = [], R = [];
+  for (let q = 0; q < SEG; q++) { const a = Math.floor(q * fr.n / SEG), b = Math.max(a + 1, Math.floor((q + 1) * fr.n / SEG)); let l = 0, c = 0, o = 0;
+    for (let i = a; i < b; i++) { if (!fr.sil[i]) { l += fr.lf[i]; c++ } o += fr.on[i] }
+    L.push(c ? l / c : .5); R.push(1 - Math.exp(-(o / ((b - a) * fr.dt)) / 5)) }
+  return { L, R } };
+C.fingerprint = fr => {
+  const { L, R } = C.contour(fr), mean = x => x.reduce((a, b) => a + b) / x.length, tot = fr.g12.reduce((a, b) => a + b) || 1, mL = mean(L), mR = mean(R);
+  const v = [...Array.from(fr.g12, x => (x / tot - 1 / 12) * 12), ...L.map(x => (x - mL) * 3), ...R.map(x => (x - mR) * 3)];
+  let a = 20260101, h = ''; // fixed hyperplanes: same audio -> same fingerprint everywhere
+  const r = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296 };
+  for (let b = 0; b < 16; b++) { let nib = 0; for (let j = 0; j < 4; j++) { let d = 0; for (let k = 0; k < v.length; k++) d += v[k] * (r() * 2 - 1); nib = nib << 1 | (d > 0 ? 1 : 0) } h += nib.toString(16) }
+  return { fp: h, L, R } };
+C.sim = (a, b) => { let d = 0; for (let i = 0; i < 16; i++) { let x = parseInt(a[i], 16) ^ parseInt(b[i], 16); while (x) { d += x & 1; x >>= 1 } } return 1 - d / 64 };
+
+/* ---------- history (localStorage) ---------- */
+const HK = 'colorseed.history.v1';
+C.hist = () => { try { return JSON.parse(localStorage.getItem(HK)) || [] } catch (e) { return [] } };
+C.histAdd = (name, fr) => {
+  const f = C.fingerprint(fr), s = C.sum(fr), H = C.hist(), r = (x, d) => +x.toFixed(d);
+  const e = { name, fp: f.fp, L: f.L.map(x => r(x, 2)), R: f.R.map(x => r(x, 2)), raw: { hx: r(s.hx, 4), hy: r(s.hy, 4), l0: r(s.l0, 4), s0: r(s.s0, 4) }, dur: Math.round(fr.n * fr.dt), t: Date.now() };
+  const i = H.findIndex(x => x.fp === e.fp || (x.name === name && C.sim(x.fp, e.fp) > .9)); if (i >= 0) H.splice(i, 1);
+  H.unshift(e); C.histSave(H); return { e, H } };
+C.histSave = H => { try { localStorage.setItem(HK, JSON.stringify(H.slice(0, 60))) } catch (e) {} };
+C.glyph = (cv, e, col) => { // 64 ticks = the fingerprint bits; inner shape = the song's busyness/brightness contour
+  const g = cv.getContext('2d'), S = cv.width, c = S / 2; g.clearRect(0, 0, S, S); g.lineCap = 'round'; g.lineWidth = S / 40; g.strokeStyle = col;
+  for (let i = 0; i < 64; i++) { const bit = (parseInt(e.fp[i >> 2], 16) >> (3 - (i & 3))) & 1, a = i / 64 * TAU - Math.PI / 2;
+    g.globalAlpha = bit ? 1 : .3; g.beginPath(); g.moveTo(c + Math.cos(a) * c * .64, c + Math.sin(a) * c * .64); g.lineTo(c + Math.cos(a) * c * (bit ? .96 : .78), c + Math.sin(a) * c * (bit ? .96 : .78)); g.stroke() }
+  g.beginPath(); e.L.forEach((l, i) => { const a = i / SEG * TAU - Math.PI / 2, r = c * (.12 + .4 * (.35 * l + .65 * e.R[i])); const x = c + Math.cos(a) * r, y = c + Math.sin(a) * r; i ? g.lineTo(x, y) : g.moveTo(x, y) });
+  g.closePath(); g.globalAlpha = .3; g.fillStyle = col; g.fill(); g.globalAlpha = 1; g.lineWidth = S / 64; g.stroke() };
 
 /* ---------- QR ---------- */
 C.qr = (cv, t) => { if (!window.qrcode) return false;

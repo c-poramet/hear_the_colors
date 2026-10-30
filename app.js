@@ -2,8 +2,8 @@ const $ = id => document.getElementById(id);
 let P = C.fromHash() || C.load(), songs = [], sel = -1;
 const KN = [['shift', 'Hue shift °', 0, 359, 1], ['sg', 'Saturation gain', 0, 1.5, .01], ['sb', 'Saturation base', -1, 1, .01], ['lg', 'Lightness gain', 0, 1, .01], ['lb', 'Lightness base', -1, 1, .01]];
 
-$('knobs').innerHTML = KN.map(k => `<label>${k[1]} <output id="o_${k[0]}"></output><input type="range" id="k_${k[0]}" min="${k[2]}" max="${k[3]}" step="${k[4]}"></label>`).join('')
-  + '<label class="row"><input type="checkbox" id="k_mir"> Mirror hue direction</label>';
+$('knobs').innerHTML = KN.map(k => `<label class="knob"><span>${k[1]}</span><output id="o_${k[0]}"></output><input type="range" id="k_${k[0]}" min="${k[2]}" max="${k[3]}" step="${k[4]}"></label>`).join('')
+  + '<div class="toggle-row"><span class="toggle-label">Mirror hue direction</span><label class="toggle-switch"><input type="checkbox" id="k_mir"><span class="toggle-track"></span></label></div>';
 KN.forEach(k => $('k_' + k[0]).oninput = e => { P[k[0]] = +e.target.value; commit() });
 $('k_mir').onchange = e => { P.mir = e.target.checked ? 1 : 0; commit() };
 
@@ -19,9 +19,9 @@ function draw() {
     if (s.target) { const t = C.fromHex(s.target); items.push({ h: t.h, s: t.s, color: s.target, hollow: 1, label: i + 1, sel: i === sel }) } });
   C.wheel($('wheel'), items);
   $('list').innerHTML = songs.map((s, i) => `<li class="${i === sel ? 'sel' : ''}" data-i="${i}"><i style="background:${C.css(s.c)}"></i><span>${i + 1}. ${s.name}</span>
-    <input type="color" value="${s.target || C.hex(s.c)}" data-t="${i}" title="target colour"><button class="ghost" data-x="${i}" title="clear target">✕</button></li>`).join('');
+    <input type="color" value="${s.target || C.hex(s.c)}" data-t="${i}" title="target colour"><button class="btn-reset" data-x="${i}" title="clear target">✕</button></li>`).join('');
   const code = C.enc(P), url = location.href.split('#')[0].replace(/[^/]*$/, 'index.html') + '#c=' + code;
-  $('code').value = url;
+  $('code').value = url; $('tag').textContent = 'SEED ' + code;
   $('qr').style.display = C.qr($('qr'), url) ? '' : 'none';
 }
 
