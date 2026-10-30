@@ -107,9 +107,9 @@ function cutUI() {
 }
 $('cutbox').onclick = e => { if (!cut || !fr || !e.target.closest('.cut-row')) return; const hex = C.hex(C.color(C.sum(fr, cut[0], cut[1]), P)); C.copy(hex).then(() => C.toast('Copied ' + hex)) };
 /* ---------- history: songs / compare / birthdays, all card based ---------- */
-let paletteSong = null, paletteClose = null, htab = lsGet('colorseed.htab', 'songs'), mapMode = lsGet('colorseed.map', 'wheel'), songMode = lsGet('colorseed.songs', 'row'), halfMap = lsGet('colorseed.half', '0') === '1', selectMap = lsGet('colorseed.select', '0') === '1', compareMetric = lsGet('colorseed.metric', 'hsl'), hsel = 0, pair = [0, 1], msel = -1; const bdOff = new Set();
+let paletteSong = null, paletteClose = null, htab = lsGet('colorseed.htab', 'songs'), mapMode = lsGet('colorseed.map', 'wheel'), songMode = lsGet('colorseed.songs', 'row'), groupBy = lsGet('colorseed.group.by', 'hue'), groupSteps = +lsGet('colorseed.group.steps', '4'), halfMap = lsGet('colorseed.half', '0') === '1', selectMap = lsGet('colorseed.select', '0') === '1', compareMetric = lsGet('colorseed.metric', 'hsl'), hsel = 0, pair = [0, 1], msel = -1; const bdOff = new Set();
 if (!/^[hsl]+$/.test(compareMetric) || !compareMetric) compareMetric = 'hsl';
-if (!['songs', 'map', 'bday'].includes(htab)) htab = 'songs';
+if (!['songs', 'map', 'analysis', 'groups', 'bday'].includes(htab)) htab = 'songs';
 const KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯', 'A♭', 'E♭', 'B♭', 'F'], rad = d => d * Math.PI / 180;
 // hue = pitch-class distribution, saturation = onset regularity, lightness = brightness contrast
 const facts = e => { const c = C.color(e.raw, P), a = (c.a + 360) % 360, r = e.raw.rr == null ? e.raw.s0 : e.raw.rr; return { c, a, r, rate: -5 * Math.log(1 - Math.min(.999, r)), key: KEYS[Math.round(a / 30) % 12] } };
@@ -214,6 +214,23 @@ function calibrateSong(e) {
 }
 function songRow(e, i) { const f = facts(e), css = C.css(f.c); return `<button class="srow${i === hsel ? ' on' : ''}" data-i="${i}" style="--c:${css}"><span class="srow-color" data-row-color title="Click to copy ${C.hex(f.c)} · Shift-click to download a colour square" aria-label="${C.hex(f.c)}" style="background:${css}"><b>${C.hex(f.c)}</b></span><span class="srow-info"><span class="srow-card" data-row-card title="Open share card">${thumb(e, f.c)}</span><span><span class="srow-name">${esc(e.name)}</span><span class="srow-meta">${fmt(e.dur)} · ${f.key} · ${f.rate.toFixed(1)}/s</span></span></span><span class="srow-palette" data-row-palette role="button" tabindex="0" title="Generate colour palettes">Palette</span><span class="srow-calibrate" data-row-calibrate role="button" tabindex="0" title="Fit calibration to this colour">Calibrate</span><span class="srow-remove" data-row-del title="Remove from history" aria-label="Remove ${esc(e.name)}">×</span></button>` }
 function songsView(L, box) { const control = `<div class="view-controls"><span class="hint">Song view</span><div class="seg"><button class="seg-btn${songMode === 'row' ? ' on' : ''}" data-songs="row">Rows</button><button class="seg-btn${songMode === 'card' ? ' on' : ''}" data-songs="card">Cards</button></div></div>`; box.innerHTML = control + (songMode === 'card' ? songCard(L[hsel]) + '<div class="gcards">' + L.map((e, i) => { const c = facts(e).c; return `<button class="gcard${i === hsel ? ' on' : ''}" data-i="${i}">${thumb(e, c)}<span class="gn">${esc(e.name)}</span>${hx(c)}</button>` }).join('') + '</div>' : '<div class="srows">' + L.map(songRow).join('') + '</div>') }
+function analysisView(L, box) {
+  const e = L[hsel], raw = e && e.raw, c = e && C.color(raw, P), pc = raw && Array.isArray(raw.pc) ? raw.pc : [], total = pc.reduce((a, b) => a + b, 0) || 1;
+  if (!e) { box.innerHTML = empty('Analyze a song to see how its colour is formed.'); return }
+  const bins = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+  box.innerHTML = `<div class="analysis-picker"><label>Song <select data-analysis-pick>${L.map((x, i) => `<option value="${i}"${i === hsel ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label></div><div class="analysis-head">${thumb(e, c, 'lg')}<div><div class="eyebrow">${esc(e.name)}</div><div class="palette-base">${C.hex(c)}</div><p class="hint">The colour is a compact summary of pitch, timing, and timbral movement.</p></div></div>
+    <div class="analysis-step"><b>1 · Pitch-class distribution → hue</b><p>Energy from all octaves is combined into twelve pitch classes. The weighted circle-of-fifths centre points to <strong>${facts(e).key}</strong>.</p><div class="pitch-bins">${bins.map((x, i) => `<div title="${x}: ${Math.round((pc[i] || 0) / total * 100)}%"><span>${x}</span><i style="height:${Math.max(3, Math.round((pc[i] || 0) / total * 100))}%"></i></div>`).join('')}</div></div>
+    <div class="analysis-step"><b>2 · Onset timing → saturation</b><p>Regular spacing between detected onsets creates stronger saturation. This song scores <strong>${Math.round((raw.rr == null ? raw.s0 : raw.rr) * 100)}%</strong> regularity.</p><div class="analysis-meter">${bar(raw.rr == null ? raw.s0 : raw.rr, C.css(c))}</div></div>
+    <div class="analysis-step"><b>3 · Brightness movement → lightness</b><p>Variation in spectral brightness across time controls lightness. This song has <strong>${Math.round((raw.contrast == null ? raw.l0 : raw.contrast) * 100)}%</strong> brightness contrast.</p><div class="analysis-meter">${bar(raw.contrast == null ? raw.l0 : raw.contrast, C.css(c))}</div></div>
+    <div class="analysis-result"><span class="analysis-swatch" style="background:${C.css(c)}"></span><span>Final colour <strong>${C.hex(c)}</strong></span><span>H ${Math.round(c.h)}° · S ${Math.round(c.s * 100)}% · L ${Math.round(c.l * 100)}%</span></div>`;
+}
+function groupsView(L, box) {
+  const value = e => { const c = facts(e).c, r = e.raw.rr == null ? e.raw.s0 : e.raw.rr, l = e.raw.contrast == null ? e.raw.l0 : e.raw.contrast; return groupBy === 'hue' ? c.h / 360 : groupBy === 'saturation' ? r : l };
+  const label = groupBy === 'hue' ? 'Hue families' : groupBy === 'saturation' ? 'Rhythm regularity' : 'Brightness contrast', groups = Array.from({ length: groupSteps }, (_, i) => L.filter(e => Math.min(groupSteps - 1, Math.floor(value(e) * groupSteps)) === i));
+  const songMarkup = e => { const c = facts(e).c; return `<button class="group-song" data-i="${L.indexOf(e)}">${thumb(e, c)}<span>${esc(e.name)}</span>${hx(c)}</button>` };
+  const groupMarkup = (g, i) => `<section class="song-group"><div class="group-title">${label} ${i + 1}<span>${g.length} song${g.length === 1 ? '' : 's'}</span></div>${g.length ? g.map(songMarkup).join('') : '<div class="bp-note">No songs in this range.</div>'}</section>`;
+  box.innerHTML = `<div class="group-controls"><label>Group by <select data-group-by><option value="hue"${groupBy === 'hue' ? ' selected' : ''}>Pitch-derived hue</option><option value="saturation"${groupBy === 'saturation' ? ' selected' : ''}>Onset regularity</option><option value="lightness"${groupBy === 'lightness' ? ' selected' : ''}>Brightness contrast</option></select></label><label>Detail <input type="range" min="2" max="8" value="${groupSteps}" data-group-steps><output>${groupSteps} groups</output></label></div><p class="hint">Songs are grouped by their normalized ${label.toLowerCase()} range. Adjust the detail to split or merge nearby songs.</p><div class="song-groups">${groups.map(groupMarkup).join('')}</div>`;
+}
 
 function drawMap(cv, L) { const g = cv.getContext('2d'), S = cv.width;
   if (mapMode === 'wheel') return C.wheel(cv, L.map((e, i) => { const c = C.color(e.raw, P); return { h: c.h, s: c.s, color: C.css(c), label: i + 1, sel: i === msel } }));
@@ -273,9 +290,11 @@ function renderHist() { const L = C.hist(), box = $('hist'); hsel = Math.min(hse
   $('hfile').onchange = e => { const f = e.target.files[0]; if (f) importHistory(f); e.target.value = '' };
   $('hclr').onclick = clearHistory;
   if (!L.length) { box.innerHTML = empty('Songs you play collect here as cards: cover, colour, key, rhythm and brightness at a glance. Compare them and try them under your birthdays.'); return }
-  (htab === 'map' ? mapView : htab === 'bday' ? bdayView : songsView)(L, box) }
+  (htab === 'map' ? mapView : htab === 'analysis' ? analysisView : htab === 'groups' ? groupsView : htab === 'bday' ? bdayView : songsView)(L, box) }
 $('htabs').onclick = e => { const t = e.target.closest('[data-t]'); if (t) { htab = t.dataset.t; lsSet('colorseed.htab', htab); renderHist() } };
 $('hist').onclick = e => { const q = s => e.target.closest(s), L = C.hist(); let b;
+  if ((b = q('[data-group-song]'))) { hsel = +b.dataset.groupSong; renderHist(); return }
+  if ((b = q('.group-song'))) { hsel = +b.dataset.i; renderHist(); return }
   if ((b = q('[data-u]'))) { const u = b.dataset.u, p = C.bdayUse(u); C.save(p); C.onSeed(p); C.toast('Using ' + C.fmtD(u)); return }
   if ((b = q('[data-row-color]'))) {
     const row = b.closest('[data-i]'), x = row && L[+row.dataset.i]; if (!x) return;
@@ -312,6 +331,11 @@ $('hist').onclick = e => { const q = s => e.target.closest(s), L = C.hist(); let
   else if ((b = q('[data-i]'))) hsel = +b.dataset.i;
   else return; renderHist() };
 $('hist').onchange = e => { const pick = e.target.closest('[data-pick]'); if (!pick) return; pair[+pick.dataset.pick] = +pick.value; renderHist() };
+$('hist').addEventListener('change', e => {
+  if (e.target.matches('[data-analysis-pick]')) { hsel = +e.target.value; renderHist() }
+  if (e.target.matches('[data-group-by]')) { groupBy = e.target.value; lsSet('colorseed.group.by', groupBy); renderHist() }
+  if (e.target.matches('[data-group-steps]')) { groupSteps = +e.target.value; lsSet('colorseed.group.steps', groupSteps); renderHist() }
+});
 $('hist').onkeydown = e => { const b = e.target.closest('[data-k],[data-row-palette]'); if (b && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); b.click() } };
 let sure = 0;
 function clearHistory() { const b = $('hclr'); if (!C.hist().length) return;
