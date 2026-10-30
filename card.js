@@ -27,38 +27,40 @@ C.cardRender = async (e, P, o = getOpts()) => {
   const MONO = '"Space Mono", monospace', UI = 'Inter, system-ui, sans-serif';
   const W = 1080, M = 36, PAD = 60, X0 = M + PAD, CW = W - 2 * X0, GAP = 52, MIN_H = 1080;
   const mc = document.createElement('canvas').getContext('2d');
-  const metadata = o.meta ? cardMeta(e) : '', birthday = o.birthday ? cardBirthday() : '';
-  const hasHead = o.brand || o.seed || metadata || birthday, hasText = o.title || o.color || o.length, hasId = o.cover || hasText, onlyFp = !hasId && !o.stats;
+  const metadata = o.meta ? cardMeta(e) : '', birthday = o.birthday ? cardBirthday() : '', details = [metadata, birthday && 'BIRTHDATE ' + birthday].filter(Boolean).join(' · ');
+  const hasHead = o.brand || o.seed, hasText = o.title || o.color || o.length || details, hasId = o.cover || hasText, onlyFp = !hasId && !o.stats;
 
   // ---- measure
   const blocks = [];
-  const head = { h: 52 + (metadata || birthday ? 34 : 0), draw: (g, y) => {
+  const head = { h: 52, draw: (g, y) => {
     if (o.brand) { g.fillStyle = c.l > .02 ? C.css(c) : '#f0f0f0'; g.beginPath(); g.arc(X0 + 8, y + 26, 8, 0, TAU); g.fill();
       T(g, 'COLOR SEED', X0 + 30, y + 35, '600 30px ' + UI, '#f0f0f0', 'left', 2) }
     if (o.seed) { g.font = '700 24px ' + MONO; g.letterSpacing = '1px'; const label = 'SEED ' + seed, sw = g.measureText(label).width + 44; g.letterSpacing = '0px';
       g.fillStyle = 'rgba(201,127,80,.1)'; C.rr(g, X0 + CW - sw, y, sw, 52, 12); g.fill(); g.lineWidth = 2; g.strokeStyle = 'rgba(201,127,80,.22)'; g.stroke();
       T(g, label, X0 + CW - sw / 2, y + 34, '700 24px ' + MONO, '#c97f50', 'center', 1) }
-    if (metadata || birthday) T(g, [metadata, birthday && 'BIRTHDATE ' + birthday].filter(Boolean).join(' · '), X0, y + 82, '400 20px ' + MONO, 'rgba(255,255,255,.48)', 'left', 1) } };
+    } };
 
   // identity block: cover + title + colour + length
   let id = null;
   if (hasId) {
     if (o.cover && hasText) {
       const cov = 264, tx = X0 + cov + 44, tw = CW - cov - 44; mc.font = '600 50px ' + UI;
-      const lines = o.title ? wrap(mc, e.name, tw, 3) : [], titleH = lines.length * 62, botH = (o.color ? 56 : 0) + (o.length ? (o.color ? 16 : 0) + 24 : 0);
+      const lines = o.title ? wrap(mc, e.name, tw, 3) : [], titleH = lines.length * 62, detailH = details ? 30 : 0, botH = detailH + (o.color ? 56 : 0) + (o.length ? (o.color ? 16 : 0) + 24 : 0);
       const h = Math.max(cov, titleH + (titleH && botH ? 28 : 0) + botH);
       id = { h, draw: (g, y) => { drawCover(g, X0, y + (h - cov) / 2, cov);
         lines.forEach((l, i) => T(g, l, tx, y + 46 + i * 62, '600 50px ' + UI, '#f0f0f0'));
         let by = y + (h - cov) / 2 + cov - botH; if (!lines.length) by = y + (h - botH) / 2;
+        if (details) { T(g, details, tx, y + titleH + 28, '400 20px ' + MONO, 'rgba(255,255,255,.48)', 'left', 1); by += detailH }
         if (o.color) { swatch(g, tx, by, 56, hex, 44); by += 56 + 16 }
         if (o.length) T(g, 'LENGTH ' + fmt(e.dur), tx, by + 20, '400 24px ' + MONO, 'rgba(255,255,255,.38)', 'left', 1) } };
     } else if (o.cover) {
       const cov = Math.min(CW, 520); id = { h: cov, draw: (g, y) => drawCover(g, X0 + (CW - cov) / 2, y, cov) };
     } else {
       const big = !o.stats && !o.fp, fs = big ? 72 : 60, lh = fs * 1.22; mc.font = `600 ${fs}px ` + UI;
-      const lines = o.title ? wrap(mc, e.name, CW, 3) : [], titleH = lines.length * lh, sw = big ? 76 : 60;
-      const h = titleH + (o.color ? (titleH ? 28 : 0) + sw : 0) + (o.length ? ((titleH || o.color) ? 20 : 0) + 24 : 0);
+      const lines = o.title ? wrap(mc, e.name, CW, 3) : [], titleH = lines.length * lh, detailH = details ? 30 : 0, sw = big ? 76 : 60;
+      const h = titleH + detailH + (o.color ? (titleH ? 28 : 0) + sw : 0) + (o.length ? ((titleH || o.color || details) ? 20 : 0) + 24 : 0);
       id = { h, draw: (g, y) => { let yy = y; lines.forEach((l, i) => T(g, l, X0, yy + fs * .95 + i * lh, `600 ${fs}px ` + UI, '#f0f0f0')); yy += titleH;
+        if (details) { yy += titleH ? 8 : 0; T(g, details, X0, yy + 20, '400 20px ' + MONO, 'rgba(255,255,255,.48)', 'left', 1); yy += detailH }
         if (o.color) { yy += titleH ? 28 : 0; swatch(g, X0, yy, sw, hex, big ? 64 : 48); yy += sw }
         if (o.length) { yy += (titleH || o.color) ? 20 : 0; T(g, 'LENGTH ' + fmt(e.dur), X0, yy + 20, '400 24px ' + MONO, 'rgba(255,255,255,.38)', 'left', 1) } } };
     }
@@ -77,7 +79,7 @@ C.cardRender = async (e, P, o = getOpts()) => {
       const pt = k => [ox + D / 2 + R * k.s * Math.sin(k.h * Math.PI / 180), oy + D / 2 - R * k.s * Math.cos(k.h * Math.PI / 180)];
       g.save(); g.globalAlpha = .5; g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.clip(); g.drawImage(tmp, ox, oy); g.restore();
       g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.14)'; g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.stroke();
-      g.lineCap = 'round'; g.lineWidth = 7;       if (o.overtime !== false) TR.forEach((k, i) => { if (!i) return; const [a, b] = pt(TR[i - 1]), [c2, d] = pt(k); g.strokeStyle = C.css(k); g.beginPath(); g.moveTo(a, b); g.lineTo(c2, d); g.stroke() });
+      g.lineCap = 'round'; g.lineWidth = 7;       if (o.overtime !== false)       if (o.overtime !== false) TR.forEach((k, i) => { if (!i) return; const [a, b] = pt(TR[i - 1]), [c2, d] = pt(k); g.strokeStyle = C.css(k); g.beginPath(); g.moveTo(a, b); g.lineTo(c2, d); g.stroke() });
       const [sx, sy] = pt(TR[0]), [ex, ey] = pt(last); g.lineWidth = 4; g.strokeStyle = '#f0f0f0'; g.beginPath(); g.arc(sx, sy, 9, 0, TAU); g.stroke(); g.fillStyle = C.css(last); g.beginPath(); g.arc(ex, ey, 14, 0, TAU); g.fill(); g.stroke(); fpCap(g, cx, y, D) } } }
     const rows = [['HUE', k => k.h / 360, k => k.h.toFixed(0) + '°', () => [0, 60, 120, 180, 240, 300, 360].map(h => [h / 360, `hsl(${h} ${last.s * 100}% ${last.l * 100}%)`])],
       ['SAT', k => k.s, k => (k.s * 100).toFixed(0) + '%', () => [[0, `hsl(${last.h} 0% ${last.l * 100}%)`], [1, `hsl(${last.h} 100% ${last.l * 100}%)`]]],
@@ -87,7 +89,7 @@ C.cardRender = async (e, P, o = getOpts()) => {
         const gr = g.createLinearGradient(tx, 0, tx + tw, 0); st().forEach(([o2, col]) => gr.addColorStop(o2, col)); g.fillStyle = gr; C.rr(g, tx, yy - 9, tw, 18, 9); g.fill(); g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.14)'; g.stroke();
         const px = i => tx + tw * f(TR[i]), py = i => yy - 8 - 44 * (1 - i / (TR.length - 1)); // time runs from the top of the lane down to the bar
         if (o.overtime !== false) { g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.3)'; g.beginPath(); TR.forEach((k, i) => i ? g.lineTo(px(i), py(i)) : g.moveTo(px(i), py(i))); g.stroke() }
-        TR.forEach((k, i) => { g.globalAlpha = .35 + .65 * i / TR.length; g.fillStyle = C.css(k); g.beginPath(); g.arc(px(i), py(i), 5, 0, TAU); g.fill() }); g.globalAlpha = 1;
+        if (o.overtime !== false) TR.forEach((k, i) => { g.globalAlpha = .35 + .65 * i / TR.length; g.fillStyle = C.css(k); g.beginPath(); g.arc(px(i), py(i), 5, 0, TAU); g.fill() }); g.globalAlpha = 1;
         g.fillStyle = C.css(last); g.lineWidth = 4; g.strokeStyle = '#fff'; g.beginPath(); g.arc(px(TR.length - 1), yy, 14, 0, TAU); g.fill(); g.stroke();
         T(g, fv(last), X0 + CW, yy + 12, '700 34px ' + MONO, '#f0f0f0', 'right') });
       fpCap(g, X0 + CW / 2, y, RH * 3 - 20) } } };
