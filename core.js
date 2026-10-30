@@ -19,7 +19,12 @@ C.dec = s => {
 C.fromHash = () => { const m = location.hash.match(/c=([\d.]+)/), p = m && C.dec(m[1]); if (p) C.save(p); return p };
 C.yearMode = () => { try { return localStorage.getItem('colorseed.year') === '1' } catch (e) { return false } };
 C.logicMode = () => { try { return localStorage.getItem('colorseed.logic') === 'smooth' ? 'smooth' : 'legacy' } catch (e) { return 'legacy' } };
-C.setLogicMode = mode => { const v = mode === 'smooth' ? 'smooth' : 'legacy'; try { localStorage.setItem('colorseed.logic', v) } catch (e) {} C.updateLogicIndicator() };
+C.setLogicMode = mode => {
+  const v = mode === 'smooth' ? 'smooth' : 'legacy', cur = lsj ? lsj('colorseed.bday.cur', null) : null;
+  try { localStorage.setItem('colorseed.logic', v) } catch (e) {}
+  C.updateLogicIndicator();
+  if (cur && cur.d && C._p && C.onSeed) { const p = C.bdayUse(cur.d); C.save(p); C.onSeed(p) }
+};
 C.updateLogicIndicator = () => document.querySelectorAll('[data-logic-indicator]').forEach(el => {
   const legacy = C.logicMode() === 'legacy';
   el.textContent = legacy ? 'LEGACY' : 'SMOOTH';
@@ -45,8 +50,8 @@ C.fromDate = (d, y = C.yearMode()) => {
     return C.dec(C.enc({
       shift: ((u * 360) % 360 + 360) % 360,
       mir: 0,
-      sg: .45 + wave(y ? 5 : 1, 1.4) * .55,
-      sb: -.12 + wave(y ? 3 : 1, 2.2) * .34,
+      sg: .55 + wave(y ? 5 : 1, 1.4) * .45,
+      sb: .18 + wave(y ? 3 : 1, 2.2) * .28,
       lg: .2 + wave(y ? 7 : 1, 3.1) * .55,
       lb: -.08 + wave(y ? 4 : 1, 4.2) * .36
     }));
