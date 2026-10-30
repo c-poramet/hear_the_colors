@@ -29,8 +29,11 @@ $('mute').onclick = () => setVol(vol === 0 ? .5 : vol, !muted && vol > 0);
 setVol(vol);
 
 /* ---------- loading ---------- */
+function setCover(a) { const im = $('coverimg');
+  if (a) { im.src = a; im.hidden = false; $('coverph').hidden = true } else { im.hidden = true; im.removeAttribute('src'); $('coverph').hidden = false } }
 async function loadFile(f) {
   fr = null; cut = null; cutUI(); au.pause(); $('pp').disabled = true; $('empty').classList.add('gone');
+  setCover(null); $('nsub').textContent = 'Analysing…'; $('nhex').textContent = '–';
   if (au.src) URL.revokeObjectURL(au.src);
   au.src = URL.createObjectURL(f); name = f.name.replace(/\.[^.]+$/, ''); $('song').textContent = name;
   if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); const s = ac.createMediaElementSource(au);
@@ -41,6 +44,7 @@ async function loadFile(f) {
     $('status').textContent = 'Decoding…'; const buf = await C.decode(f);
     fr = await C.analyze(buf, p => { $('status').textContent = `Analysing… ${Math.round(p * 100)}%`; $('prog').style.width = p * 100 + '%' });
     const art = await C.cover(f), prior = C.hist(), { e: he } = C.histAdd(name, fr, art);
+    setCover(art); $('nsub').textContent = 'Length ' + fmt(fr.n * fr.dt);
     const sim = prior.filter(x => x.fp !== he.fp).map(x => [C.sim(x.fp, he.fp), x.name]).sort((a, b) => b[0] - a[0])[0];
     $('status').textContent = sim && sim[0] > .8 ? `Resembles “${sim[1]}” · ${Math.round(sim[0] * 100)}% alike` : 'Ready. Press play.';
     $('pp').disabled = false; renderHist();
@@ -142,7 +146,7 @@ function drawViz(t, live) {
   let bass = 0; for (let i = 0; i < 6; i++) bass += spec[i]; bass /= 1530;
   const g = og.createRadialGradient(W / 2, WY, 20, W / 2, WY, 340); g.addColorStop(0, hsla(cs, .3)); g.addColorStop(1, hsla(cs, 0)); og.fillStyle = g; og.fillRect(0, 0, W, H);
   // colour instrument: wheel or HSL bars, crossfaded
-  if (mt < .99) { const wr = 140 * (1 + bass * .04), ws = 2 * wr * wc.width / (wc.width / 2 - 16);
+  if (mt < .99) { const wr = 128 * (1 + bass * .04), ws = wr * wc.width / (wc.width / 2 - 16); // wheel disc radius R=wc/2-16 maps to wr
     og.globalAlpha = (live ? 1 : .35) * (1 - mt); og.drawImage(wc, W / 2 - ws / 2, WY - ws / 2, ws, ws);
     og.lineWidth = 2; og.strokeStyle = 'rgba(255,255,255,.2)'; og.beginPath(); og.arc(W / 2, WY, wr, 0, TAU); og.stroke(); og.globalAlpha = 1 }
   if (mt > .01) { og.globalAlpha = mt * (live ? 1 : .5); drawHSL(); og.globalAlpha = 1 }
@@ -173,6 +177,7 @@ function frame(t) {
   mt += ((hsl ? 1 : 0) - mt) * (1 - Math.exp(-dt / 90));
   if (fr) {
     $('sH').textContent = cs.h.toFixed(0) + '°'; $('sS').textContent = (cs.s * 100).toFixed(0) + '%'; $('sL').textContent = (cs.l * 100).toFixed(0) + '%'; $('sR').textContent = rate.toFixed(1);
+    $('nhex').textContent = C.hex(cs); $('ncol').style.background = C.css(cs);
     $('time').textContent = fmt(au.currentTime) + ' / ' + fmt(au.duration || 0);
     drawStrip(idx);
     if (loop && cut && au.currentTime >= cut[1] * fr.dt) au.currentTime = cut[0] * fr.dt;

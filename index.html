@@ -9,12 +9,19 @@
 <a class="mode-link on" href="index.html">Play</a><a class="mode-link" href="calibrate.html">Calibrate</a><button class="guesses-left-badge bday-badge" id="bday">BIRTHDAY</button><span class="guesses-left-badge" id="tag"></span></header>
 <main class="main"><div class="solver-layout">
 <section class="left-panel panel stage" id="stage">
-  <div class="panel-title">Now playing <span id="song">nothing loaded</span></div>
-  <div class="viz-wrap">
+  <div class="panel-title">Now playing</div>
+  <div class="now-card">
+    <div class="cover" id="cover"><img id="coverimg" alt="" hidden>
+      <div class="cover-ph" id="coverph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg></div></div>
+    <div class="now-meta">
+      <div class="now-name" id="song">Nothing loaded</div>
+      <div class="now-sub mono" id="nsub">Load a song to begin</div>
+      <div class="now-col"><i id="ncol"></i><span class="mono" id="nhex">–</span></div></div></div>
+  <div class="viz-wrap"><div class="viz-box">
     <canvas id="viz" width="800" height="560" role="img" aria-label="Live audio spectrum with the running colour"></canvas>
     <div class="viz-toggle"><span>HSL bars</span><label class="toggle-switch"><input type="checkbox" id="hslt" aria-label="Show HSL bars instead of the colour wheel"><span class="toggle-track"></span></label></div>
     <div class="viz-empty" id="empty">Drop an audio file here, or press Load audio</div>
-  </div>
+  </div></div>
   <div class="stats-bar compact">
     <div class="stat-chip"><span class="stat-val" id="sH">–</span><span class="stat-lbl">hue</span></div>
     <div class="stat-chip"><span class="stat-val" id="sS">–</span><span class="stat-lbl">saturation</span></div>
@@ -37,7 +44,7 @@
   <section class="panel"><div class="panel-title">Cut <button class="btn-reset" id="cclr">Clear</button></div>
     <div id="cutbox"></div>
     <div class="toggle-row"><span class="toggle-label">Loop the cut</span><label class="toggle-switch"><input type="checkbox" id="loop"><span class="toggle-track"></span></label></div></section>
-  <section class="panel"><div class="panel-title">History <button class="btn-reset" id="hclr">Clear</button></div><div id="hist"></div></section>
+  <section class="panel hist-panel"><div class="panel-title">History <button class="btn-reset" id="hclr">Clear</button></div><div id="hist"></div></section>
 </div></div></main>
 <footer class="footer"><span class="footer-credit">Color Seed · see music, hear colour</span></footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
