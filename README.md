@@ -1,6 +1,45 @@
 # Hear & See
 
-See music, hear colour. Load a song and Hear & See turns it into a colour: **hue** is where the song sits on the circle of fifths (its key area), **saturation** is rhythmic density (hits per second), **lightness** is the brightness of its timbre. Everything runs in your browser; audio never leaves your device.
+See music, hear colour. Load a song and Hear & See turns its musical structure into a colour. The current model uses the song's pitch-class distribution for **hue**, onset-timing regularity for **saturation**, and brightness variation over time for **lightness**. Everything runs in your browser; audio never leaves your device.
+
+## Audio-to-colour logic
+
+The current audio model is always enabled; there is no LEGACY/NEW switch.
+
+### Hue: pitch-class distribution
+
+The analyzer divides the audible pitch content into the 12 chromatic pitch classes: C, C-sharp, D, D-sharp, E, F, F-sharp, G, G-sharp, A, A-sharp and B. Octaves are combined, so the same note in different octaves contributes to the same bin.
+
+For each analysis frame, spectral energy in the pitch range from approximately 55 Hz to 2,000 Hz is assigned to its pitch class. The accumulated 12-bin distribution is converted into a circular mean using the circle-of-fifths ordering. This gives the hue a relationship to the song's tonal centre while still accounting for more than one prominent note. A song with several strong pitch areas can therefore land between them instead of being reduced to one detected key.
+
+### Saturation: rhythmic regularity
+
+The analyzer detects transient-like onset peaks from changes in the spectrum. It measures the time between consecutive detected onsets and calculates:
+
+`regularity = clamp(1 - standard deviation(intervals) / mean interval, 0, 1)`
+
+Evenly spaced onsets produce a higher regularity value and therefore a more saturated colour. Irregular timing, sparse onset information, or too few detected intervals produces a lower value and therefore a less saturated colour. This describes timing consistency, not simply the number of hits per second.
+
+### Lightness: brightness contrast over time
+
+Each frame receives a spectral-brightness value based on the distribution of energy up to approximately 8,000 Hz. The model calculates the duration-weighted standard deviation of those values over the song and scales it into the `[0, 1]` range:
+
+`contrast = clamp(2.5 × brightness standard deviation, 0, 1)`
+
+Songs whose timbre changes substantially over time receive a higher lightness input. Songs with a more uniform brightness profile receive a lower one. This measures temporal contrast rather than treating one average brightness as the complete description of the song.
+
+### Time weighting and partial playback
+
+Analysis frames are weighted by their duration. Longer portions of a song contribute proportionally more to its summary than shorter portions. The same feature summaries are used for a selected Cut range, so a partial section can produce its own colour.
+
+The five calibration knobs then transform these normalized feature values into the final HSL colour:
+
+- **Hue shift** rotates the pitch-derived hue.
+- **Mirror hue direction** reverses the hue direction.
+- **Saturation gain/base** scales and offsets rhythmic regularity.
+- **Lightness gain/base** scales and offsets brightness contrast.
+
+Older history records that do not contain the new pitch, regularity, or contrast fields retain their stored summary values. Newly analyzed songs and newly imported records with the richer fields use this current model.
 
 ## Pages
 

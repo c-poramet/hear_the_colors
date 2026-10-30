@@ -150,8 +150,17 @@ C.cover = f => new Promise(res => { if (!window.jsmediatags) return res(null);
 /* ---------- colour ---------- */
 const hsl2rgb = (h, s, l) => { const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
   return [0, 8, 4].map(n => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))))) };
-C.color = (f, p) => { const a = Math.atan2(f.hy, f.hx) * 180 / Math.PI;
-  return { a, h: (((p.mir ? -a : a) + p.shift) % 360 + 360) % 360, s: cl(p.sb + p.sg * f.s0, 0, 1), l: cl(p.lb + p.lg * f.l0, .05, .95) } };
+C.color = (f, p) => {
+  let a = Math.atan2(f.hy, f.hx) * 180 / Math.PI, saturation = f.s0, lightness = f.l0;
+  if (Array.isArray(f.pc)) {
+    let x = 0, y = 0;
+    f.pc.forEach((v, i) => { const r = i * 7 * Math.PI / 6; x += v * Math.cos(r); y += v * Math.sin(r) });
+    if (x || y) a = Math.atan2(y, x) * 180 / Math.PI;
+    saturation = f.rr == null ? f.s0 : f.rr;
+    lightness = f.contrast == null ? f.l0 : f.contrast;
+  }
+  return { a, h: (((p.mir ? -a : a) + p.shift) % 360 + 360) % 360, s: cl(p.sb + p.sg * saturation, 0, 1), l: cl(p.lb + p.lg * lightness, .05, .95) };
+};
 C.css = c => `hsl(${c.h.toFixed(1)} ${(c.s * 100).toFixed(1)}% ${(c.l * 100).toFixed(1)}%)`;
 C.hex = c => '#' + hsl2rgb(c.h, c.s, c.l).map(v => v.toString(16).padStart(2, '0')).join('');
 C.fromHex = x => { const r = [1, 3, 5].map(i => parseInt(x.substr(i, 2), 16) / 255), mx = Math.max(...r), mn = Math.min(...r), l = (mx + mn) / 2, d = mx - mn;
@@ -191,21 +200,27 @@ C.analyze = async (buf, prog) => {
     const g = Math.hypot(X, Y) || 1; hx[i] = X / g; hy[i] = Y / g; fx[i] = fl;
     lf[i] = cm ? cl(((cen / cm - l40) / span - .35) / .45, 0, 1) : .5;
     sil[i] = Math.sqrt(e / N) < .003 ? 1 : 0;
-    if (!sil[i]) { const z = cv.reduce((a, b) => a + b) || 1; for (let p = 0; p < 12; p++) g12[p] += cv[p] / z }
+    if (!sil[i]) { const z = cv.reduce((a, b) => a + b) || 1; for (let p = 0; p < 12; p++) g12[p] += cv[p] / z * dt }
     if (i % 150 === 0) { prog && prog(i / n); await new Promise(r => setTimeout(r)) }
   }
   let mx = 1e-9; for (let i = 0; i < n; i++) mx = Math.max(mx, fx[i]);
   for (let i = 0; i < n; i++) fx[i] /= mx;
   for (let i = 0; i < n; i++) { const a = Math.max(0, i - 10), b = Math.min(n, i + 11); let m = 0; for (let j = a; j < b; j++) m += fx[j]; m /= b - a;
     on[i] = !sil[i] && fx[i] > m * 1.5 + .05 && fx[i] >= (fx[i - 1] || 0) && fx[i] > (fx[i + 1] || 0) ? 1 : 0 }
-  const cx = new Float64Array(n + 1), cy = new Float64Array(n + 1), cL = new Float64Array(n + 1), cn = new Float64Array(n + 1), co = new Float64Array(n + 1);
+  const cx = new Float64Array(n + 1), cy = new Float64Array(n + 1), cL = new Float64Array(n + 1), cL2 = new Float64Array(n + 1), cn = new Float64Array(n + 1), co = new Float64Array(n + 1);
   for (let i = 0; i < n; i++) { const s = !sil[i];
-    cx[i + 1] = cx[i] + (s ? hx[i] : 0); cy[i + 1] = cy[i] + (s ? hy[i] : 0); cL[i + 1] = cL[i] + (s ? lf[i] : 0); cn[i + 1] = cn[i] + (s ? 1 : 0); co[i + 1] = co[i] + on[i] }
-  return { n, dt, cx, cy, cl: cL, cn, co, lf, on, sil, g12 };
+    cx[i + 1] = cx[i] + (s ? hx[i] * dt : 0); cy[i + 1] = cy[i] + (s ? hy[i] * dt : 0); cL[i + 1] = cL[i] + (s ? lf[i] * dt : 0); cL2[i + 1] = cL2[i] + (s ? lf[i] * lf[i] * dt : 0); cn[i + 1] = cn[i] + (s ? dt : 0); co[i + 1] = co[i] + on[i] * dt }
+  const intervals = []; let prevOn = -1;
+  for (let i = 0; i < n; i++) if (on[i]) { if (prevOn >= 0) intervals.push((i - prevOn) * dt); prevOn = i }
+  const mean = intervals.length ? intervals.reduce((a, b) => a + b, 0) / intervals.length : 0;
+  const variance = mean ? intervals.reduce((a, b) => a + (b - mean) ** 2, 0) / intervals.length : 1;
+  const rr = intervals.length > 1 ? cl(1 - Math.sqrt(variance) / mean, 0, 1) : 0;
+  const total = g12.reduce((a, b) => a + b) || 1, pc = Array.from(g12, v => v / total), w = cn[n], ml = w ? cL[n] / w : .5;
+  return { n, dt, cx, cy, cl: cL, cL2, cn, co, lf, on, sil, g12, pc, rr, contrast: w ? cl(Math.sqrt(Math.max(0, cL2[n] / w - ml * ml)) * 2.5, 0, 1) : 0 };
 };
 // averages over sections [a,b): any slice of a song gets its own colour in O(1)
-C.sum = (fr, a = 0, b = fr.n) => { const n = fr.cn[b] - fr.cn[a], t = (b - a) * fr.dt || 1, rate = (fr.co[b] - fr.co[a]) / t;
-  return { hx: n ? (fr.cx[b] - fr.cx[a]) / n : 0, hy: n ? (fr.cy[b] - fr.cy[a]) / n : 0, l0: n ? (fr.cl[b] - fr.cl[a]) / n : .5, s0: 1 - Math.exp(-rate / 5), rate } };
+C.sum = (fr, a = 0, b = fr.n) => { const n = fr.cn[b] - fr.cn[a], t = (b - a) * fr.dt || 1, rate = (fr.co[b] - fr.co[a]) / t, l0 = n ? (fr.cl[b] - fr.cl[a]) / n : .5;
+  return { hx: n ? (fr.cx[b] - fr.cx[a]) / n : 0, hy: n ? (fr.cy[b] - fr.cy[a]) / n : 0, l0, s0: 1 - Math.exp(-rate / 5), contrast: fr.contrast, rr: fr.rr, pc: fr.pc, rate } };
 
 /* ---------- wheel ---------- */
 C.wheel = (cv, items) => {
@@ -233,7 +248,7 @@ C.wheelPos = (cv, e) => { const r = cv.getBoundingClientRect(), S = cv.width, k 
 const SEG = 16;
 C.contour = fr => { const L = [], R = [];
   for (let q = 0; q < SEG; q++) { const a = Math.floor(q * fr.n / SEG), b = Math.max(a + 1, Math.floor((q + 1) * fr.n / SEG)); let l = 0, c = 0, o = 0;
-    for (let i = a; i < b; i++) { if (!fr.sil[i]) { l += fr.lf[i]; c++ } o += fr.on[i] }
+    for (let i = a; i < b; i++) { if (!fr.sil[i]) { l += fr.lf[i] * fr.dt; c += fr.dt } o += fr.on[i] * fr.dt }
     L.push(c ? l / c : .5); R.push(1 - Math.exp(-(o / ((b - a) * fr.dt)) / 5)) }
   return { L, R } };
 C.fingerprint = fr => {
@@ -250,7 +265,7 @@ const HK = 'colorseed.history.v1';
 C.hist = () => { try { return JSON.parse(localStorage.getItem(HK)) || [] } catch (e) { return [] } };
 C.histAdd = (name, fr, art, meta = {}) => {
   const f = C.fingerprint(fr), s = C.sum(fr), H = C.hist(), r = (x, d) => +x.toFixed(d);
-  const e = { name, fp: f.fp, L: f.L.map(x => r(x, 2)), R: f.R.map(x => r(x, 2)), raw: { hx: r(s.hx, 4), hy: r(s.hy, 4), l0: r(s.l0, 4), s0: r(s.s0, 4) }, dur: Math.round(fr.n * fr.dt), T: C.traj(fr), t: Date.now(), meta: { artist: meta.artist || '', album: meta.album || '', year: meta.year || '' } };
+  const e = { name, fp: f.fp, L: f.L.map(x => r(x, 2)), R: f.R.map(x => r(x, 2)), raw: { hx: r(s.hx, 4), hy: r(s.hy, 4), l0: r(s.l0, 4), s0: r(s.s0, 4), contrast: r(s.contrast, 4), rr: r(s.rr, 4), pc: s.pc.map(x => r(x, 5)) }, dur: Math.round(fr.n * fr.dt), T: C.traj(fr), t: Date.now(), meta: { artist: meta.artist || '', album: meta.album || '', year: meta.year || '' } };
   const i = H.findIndex(x => x.fp === e.fp || (x.name === name && C.sim(x.fp, e.fp) > .9));
   if (art) e.art = art; else if (i >= 0 && H[i].art) e.art = H[i].art;
   if (i >= 0 && !meta.artist && !meta.album && !meta.year && H[i].meta) e.meta = H[i].meta;
@@ -273,7 +288,7 @@ C.histImport = value => {
     return !e.art || (typeof e.art === 'string' && e.art.startsWith('data:image/') && e.art.length <= 2 * 1024 * 1024);
   }).map(e => ({
     name: e.name.slice(0, 240), fp: e.fp.toLowerCase(), L: e.L.slice(0, 64), R: e.R.slice(0, 64),
-    raw: { hx: e.raw.hx, hy: e.raw.hy, l0: e.raw.l0, s0: e.raw.s0 }, dur: Math.max(0, Math.round(e.dur)),
+    raw: { hx: e.raw.hx, hy: e.raw.hy, l0: e.raw.l0, s0: e.raw.s0, ...(Array.isArray(e.raw.pc) ? { pc: e.raw.pc.slice(0, 12) } : {}), ...(Number.isFinite(e.raw.rr) ? { rr: e.raw.rr } : {}), ...(Number.isFinite(e.raw.contrast) ? { contrast: e.raw.contrast } : {}) }, dur: Math.max(0, Math.round(e.dur)),
     T: Array.isArray(e.T) ? e.T.slice(0, 40).map(t => t.slice(0, 4)) : [], t: Number.isFinite(e.t) ? e.t : Date.now(),
     meta: e.meta && typeof e.meta === 'object' ? { artist: String(e.meta.artist || '').slice(0, 240), album: String(e.meta.album || '').slice(0, 240), year: String(e.meta.year || '').slice(0, 4) } : {},
     ...(e.art ? { art: e.art } : {})
