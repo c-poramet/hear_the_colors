@@ -122,7 +122,7 @@ function songCard(e) { const f = facts(e), css = C.css(f.c);
   return `<div class="scard" style="--c:${css}">${thumb(e, f.c, 'lg')}<div class="sc-body"><div class="sc-name">${esc(e.name)}</div><div class="sc-sub">${fmt(e.dur)} · ${e.fp}</div>${hx(f.c)}</div>
   <div class="sc-meters"><div class="mt">${dial(f.a, css, f.key)}<span>Key</span></div><div class="mt">${bar(f.r, css)}<span>Rhythm ${f.rate.toFixed(1)}/s</span></div><div class="mt">${bar(f.c.l, css)}<span>Brightness</span></div></div>
   <div class="sc-act"><button class="btn-reset" data-a="copy">Copy hex</button><button class="btn-reset" data-a="card">Share card</button><button class="btn-reset" data-a="del">Remove</button></div></div>` }
-function songRow(e, i) { const f = facts(e), css = C.css(f.c); return `<button class="srow${i === hsel ? ' on' : ''}" data-i="${i}" style="--c:${css}"><span class="srow-color" aria-label="${C.hex(f.c)}" style="background:${css}"><b>${C.hex(f.c)}</b></span><span class="srow-info">${thumb(e, f.c)}<span><span class="srow-name">${esc(e.name)}</span><span class="srow-meta">${fmt(e.dur)} · ${f.key} · ${f.rate.toFixed(1)}/s</span></span></span><span class="srow-actions"><span data-a="copy">Copy</span><span data-a="card">Card</span></span></button>` }
+function songRow(e, i) { const f = facts(e), css = C.css(f.c); return `<button class="srow${i === hsel ? ' on' : ''}" data-i="${i}" style="--c:${css}"><span class="srow-color" data-row-color title="Click to copy ${C.hex(f.c)} · Shift-click to download a colour square" aria-label="${C.hex(f.c)}" style="background:${css}"><b>${C.hex(f.c)}</b></span><span class="srow-info"><span class="srow-card" data-row-card title="Open share card">${thumb(e, f.c)}</span><span><span class="srow-name">${esc(e.name)}</span><span class="srow-meta">${fmt(e.dur)} · ${f.key} · ${f.rate.toFixed(1)}/s</span></span></span></button>` }
 function songsView(L, box) { const control = `<div class="view-controls"><span class="hint">Song view</span><div class="seg"><button class="seg-btn${songMode === 'row' ? ' on' : ''}" data-songs="row">Rows</button><button class="seg-btn${songMode === 'card' ? ' on' : ''}" data-songs="card">Cards</button></div></div>`; box.innerHTML = control + (songMode === 'card' ? songCard(L[hsel]) + '<div class="gcards">' + L.map((e, i) => { const c = facts(e).c; return `<button class="gcard${i === hsel ? ' on' : ''}" data-i="${i}">${thumb(e, c)}<span class="gn">${esc(e.name)}</span>${hx(c)}</button>` }).join('') + '</div>' : '<div class="srows">' + L.map(songRow).join('') + '</div>') }
 
 function drawMap(cv, L) { const g = cv.getContext('2d'), S = cv.width;
@@ -178,6 +178,16 @@ function renderHist() { const L = C.hist(), box = $('hist'); hsel = Math.min(hse
 $('htabs').onclick = e => { const t = e.target.closest('[data-t]'); if (t) { htab = t.dataset.t; lsSet('colorseed.htab', htab); renderHist() } };
 $('hist').onclick = e => { const q = s => e.target.closest(s), L = C.hist(); let b;
   if ((b = q('[data-u]'))) { const u = b.dataset.u, p = C.bdayUse(u); C.save(p); C.onSeed(p); C.toast('Using ' + C.fmtD(u)); return }
+  if ((b = q('[data-row-color]'))) {
+    const row = b.closest('[data-i]'), x = row && L[+row.dataset.i]; if (!x) return;
+    const hex = C.hex(C.color(x.raw, P));
+    if (e.shiftKey) {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 512; const g = cv.getContext('2d'); g.fillStyle = hex; g.fillRect(0, 0, 512, 512);
+      cv.toBlob(blob => { if (!blob) return C.toast('Could not create the colour image'); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'colorseed-' + hex.slice(1) + '.png'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); C.toast('Colour square saved') }, 'image/png');
+    } else C.copy(hex).then(() => C.toast('Copied ' + hex));
+    return;
+  }
+  if ((b = q('[data-row-card]'))) { const row = b.closest('[data-i]'), x = row && L[+row.dataset.i]; if (x) C.card(x, P); return }
   if ((b = q('[data-m]'))) { mapMode = b.dataset.m; lsSet('colorseed.map', mapMode) }
   else if ((b = q('[data-songs]'))) { songMode = b.dataset.songs; lsSet('colorseed.songs', songMode) }
   else if ((b = q('[data-select]'))) { selectMap = b.dataset.select === '1'; lsSet('colorseed.select', selectMap ? '1' : '0') }
