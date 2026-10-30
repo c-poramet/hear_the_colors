@@ -18,7 +18,14 @@ C.dec = s => {
 };
 C.fromHash = () => { const m = location.hash.match(/c=([\d.]+)/), p = m && C.dec(m[1]); if (p) C.save(p); return p };
 C.yearMode = () => { try { return localStorage.getItem('colorseed.year') === '1' } catch (e) { return false } };
-C.setYearMode = v => { try { localStorage.setItem('colorseed.year', v ? '1' : '0') } catch (e) {} };
+C.updateYearIndicator = () => document.querySelectorAll('[data-year-indicator]').forEach(el => {
+  const on = C.yearMode();
+  el.textContent = 'YEAR ' + (on ? 'ON' : 'OFF');
+  el.classList.toggle('on', on);
+  el.classList.toggle('off', !on);
+  el.setAttribute('aria-label', 'Include year ' + (on ? 'on' : 'off'));
+});
+C.setYearMode = v => { try { localStorage.setItem('colorseed.year', v ? '1' : '0') } catch (e) {} C.updateYearIndicator() };
 const R5 = [.8566748838545029, .7338918566271260, .6287067210378087, .5385972572236101, .4614027427763898, .3819660112501051];
 C.fromDate = (d, y = C.yearMode()) => { // same day -> same seed. Year ignored (default): the 366 calendar days get evenly spaced hue shifts and the other knobs follow a low-discrepancy sequence, so neighbouring days land far apart. Year included: every calendar date since 1970 gets its own step of that sequence.
   let n, u = null; if (y) n = Math.floor(Date.parse(d + 'T00:00:00Z') / 864e5); else { n = Math.round((Date.UTC(2000, +d.slice(5, 7) - 1, +d.slice(8, 10)) - Date.UTC(2000, 0, 1)) / 864e5); u = (n * 313 % 366) / 366 }
@@ -106,6 +113,7 @@ const bRender = () => {
     <div class="bp-sec"><div class="bp-title">Add a birthday</div><div class="bp-add"><input class="field" id="bpin" placeholder="${C.yearMode() ? 'dd/mm/yyyy' : 'dd/mm, year ignored'}" inputmode="numeric" maxlength="10" aria-label="Birthdate"><button class="btn-reset" data-a="add">Use</button></div><div class="toggle-row"><span class="toggle-label">Include year in seed</span><label class="toggle-switch"><input type="checkbox" data-a="yr" aria-label="Include year in seed"${C.yearMode() ? ' checked' : ''}><span class="toggle-track"></span></label></div></div></div>`;
 };
 C.seedTag = p => { const el = id => document.getElementById(id), code = C.enc(p), b = el('bday'), d = C.bdays(code); C._p = p; C.bdayBuild(() => C.seedTag(C._p));
+  C.updateYearIndicator();
   const cur = lsj(BCK, null), active = cur && cur.code === code ? cur.d : null;
   el('tag').textContent = 'SEED ' + code + (active ? ' · ' + C.fmtLongD(active) : '');
   let pop = el('bpop');
