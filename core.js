@@ -226,11 +226,12 @@ C.sim = (a, b) => { let d = 0; for (let i = 0; i < 16; i++) { let x = parseInt(a
 /* ---------- history (localStorage) ---------- */
 const HK = 'colorseed.history.v1';
 C.hist = () => { try { return JSON.parse(localStorage.getItem(HK)) || [] } catch (e) { return [] } };
-C.histAdd = (name, fr, art) => {
+C.histAdd = (name, fr, art, meta = {}) => {
   const f = C.fingerprint(fr), s = C.sum(fr), H = C.hist(), r = (x, d) => +x.toFixed(d);
-  const e = { name, fp: f.fp, L: f.L.map(x => r(x, 2)), R: f.R.map(x => r(x, 2)), raw: { hx: r(s.hx, 4), hy: r(s.hy, 4), l0: r(s.l0, 4), s0: r(s.s0, 4) }, dur: Math.round(fr.n * fr.dt), T: C.traj(fr), t: Date.now() };
+  const e = { name, fp: f.fp, L: f.L.map(x => r(x, 2)), R: f.R.map(x => r(x, 2)), raw: { hx: r(s.hx, 4), hy: r(s.hy, 4), l0: r(s.l0, 4), s0: r(s.s0, 4) }, dur: Math.round(fr.n * fr.dt), T: C.traj(fr), t: Date.now(), meta: { artist: meta.artist || '', album: meta.album || '', year: meta.year || '' } };
   const i = H.findIndex(x => x.fp === e.fp || (x.name === name && C.sim(x.fp, e.fp) > .9));
   if (art) e.art = art; else if (i >= 0 && H[i].art) e.art = H[i].art;
+  if (i >= 0 && !meta.artist && !meta.album && !meta.year && H[i].meta) e.meta = H[i].meta;
   if (i >= 0) H.splice(i, 1);
   H.unshift(e); C.histSave(H); return { e, H } };
 // 40 snapshots of the running colour: lets share cards replay the path a song took

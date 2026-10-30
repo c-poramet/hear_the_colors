@@ -43,7 +43,7 @@ async function loadFile(f) {
   try {
     $('status').textContent = 'Decoding…'; const buf = await C.decode(f);
     fr = await C.analyze(buf, p => { $('status').textContent = `Analysing… ${Math.round(p * 100)}%`; $('prog').style.width = p * 100 + '%' });
-    const art = await C.cover(f), prior = C.hist(), { e: he } = C.histAdd(name, fr, art);
+    const art = await C.cover(f), meta = await readMetadata(f), prior = C.hist(), { e: he } = C.histAdd(name, fr, art, meta);
     setCover(art); $('nsub').textContent = 'Length ' + fmt(fr.n * fr.dt);
     const sim = prior.filter(x => x.fp !== he.fp).map(x => [C.sim(x.fp, he.fp), x.name]).sort((a, b) => b[0] - a[0])[0];
     $('status').textContent = sim && sim[0] > .8 ? `Resembles “${sim[1]}” · ${Math.round(sim[0] * 100)}% alike` : 'Ready. Press play.';
@@ -53,6 +53,13 @@ async function loadFile(f) {
 }
 $('file').onchange = e => { const f = e.target.files[0]; if (f) loadFile(f); e.target.value = '' };
 const isAudio = f => f && (/^audio\//.test(f.type) || /\.(mp3|m4a|aac|wav|flac|ogg|opus|weba|webm|aiff?)$/i.test(f.name));
+const readMetadata = f => new Promise(resolve => {
+  if (!window.jsmediatags || !f) return resolve({});
+  window.jsmediatags.read(f, { onSuccess: tag => {
+    const t = tag.tags || {};
+    resolve({ artist: t.artist || '', album: t.album || '', year: String(t.year || t.date || '').slice(0, 4) });
+  }, onError: () => resolve({}) });
+});
 ['dragenter', 'dragover'].forEach(ev => addEventListener(ev, e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); $('stage').classList.add('dragging') } }));
 addEventListener('dragleave', e => { if (!e.relatedTarget) $('stage').classList.remove('dragging') });
 addEventListener('drop', e => { e.preventDefault(); $('stage').classList.remove('dragging'); const f = e.dataTransfer.files[0]; if (!f) return;
@@ -97,7 +104,7 @@ function cutUI() {
 }
 $('cutbox').onclick = e => { if (!cut || !fr || !e.target.closest('.cut-row')) return; const hex = C.hex(C.color(C.sum(fr, cut[0], cut[1]), P)); C.copy(hex).then(() => C.toast('Copied ' + hex)) };
 /* ---------- history: songs / compare / birthdays, all card based ---------- */
-let htab = lsGet('colorseed.htab', 'songs'), mapMode = lsGet('colorseed.map', 'wheel'), hsel = 0, pair = [0, 1], msel = -1; const bdOff = new Set();
+let htab = lsGet('colorseed.htab', 'songs'), mapMode = lsGet('colorseed.map', 'wheel'), songMode = lsGet('colorseed.songs', 'row'), halfMap = lsGet('colorseed.half', '0') === '1', selectMap = lsGet('colorseed.select', '0') === '1', hsel = 0, pair = [0, 1], msel = -1; const bdOff = new Set();
 if (!['songs', 'map', 'bday'].includes(htab)) htab = 'songs';
 const KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯', 'A♭', 'E♭', 'B♭', 'F'], rad = d => d * Math.PI / 180;
 // hue = place on the circle of fifths (key area), saturation = rhythmic density, lightness = timbre brightness
@@ -115,7 +122,8 @@ function songCard(e) { const f = facts(e), css = C.css(f.c);
   return `<div class="scard" style="--c:${css}">${thumb(e, f.c, 'lg')}<div class="sc-body"><div class="sc-name">${esc(e.name)}</div><div class="sc-sub">${fmt(e.dur)} · ${e.fp}</div>${hx(f.c)}</div>
   <div class="sc-meters"><div class="mt">${dial(f.a, css, f.key)}<span>Key</span></div><div class="mt">${bar(f.r, css)}<span>Rhythm ${f.rate.toFixed(1)}/s</span></div><div class="mt">${bar(f.c.l, css)}<span>Brightness</span></div></div>
   <div class="sc-act"><button class="btn-reset" data-a="copy">Copy hex</button><button class="btn-reset" data-a="card">Share card</button><button class="btn-reset" data-a="del">Remove</button></div></div>` }
-function songsView(L, box) { box.innerHTML = songCard(L[hsel]) + '<div class="gcards">' + L.map((e, i) => { const c = facts(e).c; return `<button class="gcard${i === hsel ? ' on' : ''}" data-i="${i}">${thumb(e, c)}<span class="gn">${esc(e.name)}</span>${hx(c)}</button>` }).join('') + '</div>' }
+function songRow(e, i) { const f = facts(e), css = C.css(f.c); return `<button class="srow${i === hsel ? ' on' : ''}" data-i="${i}" style="--c:${css}">${thumb(e, f.c)}<span class="srow-name">${esc(e.name)}</span><span class="srow-meta">${fmt(e.dur)} · ${f.key} · ${f.rate.toFixed(1)}/s</span>${hx(f.c)}<span class="srow-actions"><span data-a="copy">Copy</span><span data-a="card">Card</span></span></button>` }
+function songsView(L, box) { const control = `<div class="view-controls"><span class="hint">Song view</span><div class="seg"><button class="seg-btn${songMode === 'row' ? ' on' : ''}" data-songs="row">Rows</button><button class="seg-btn${songMode === 'card' ? ' on' : ''}" data-songs="card">Cards</button></div></div>`; box.innerHTML = control + (songMode === 'card' ? songCard(L[hsel]) + '<div class="gcards">' + L.map((e, i) => { const c = facts(e).c; return `<button class="gcard${i === hsel ? ' on' : ''}" data-i="${i}">${thumb(e, c)}<span class="gn">${esc(e.name)}</span>${hx(c)}</button>` }).join('') + '</div>' : '<div class="srows">' + L.map(songRow).join('') + '</div>') }
 
 function drawMap(cv, L) { const g = cv.getContext('2d'), S = cv.width;
   if (mapMode === 'wheel') return C.wheel(cv, L.map((e, i) => { const c = C.color(e.raw, P); return { h: c.h, s: c.s, color: C.css(c), label: i + 1, sel: i === msel } }));
@@ -126,10 +134,13 @@ function drawMap(cv, L) { const g = cv.getContext('2d'), S = cv.width;
 function pairCard(a, b, i, j) { const r = rel(a, b), A = r.A, B = r.B, ca = C.css(A.c), cb = C.css(B.c);
   return `<div class="pair"><div class="ph">${thumb(a, A.c, '', i + 1)}<div class="pp"><b>${r.pct}%</b><span>alike</span></div>${thumb(b, B.c, '', j + 1)}</div>
   <div class="prow"><span>Key</span><div class="pd">${dial(A.a, ca, A.key)}<em>${r.st < .5 ? 'same key area' : Math.round(r.st) + (Math.round(r.st) === 1 ? ' fifth apart' : ' fifths apart')}</em>${dial(B.a, cb, B.key)}</div></div>
-  <div class="prow"><span>Rhythm</span><div class="bars">${bar(A.r, ca)}${bar(B.r, cb)}</div></div><div class="prow"><span>Bright</span><div class="bars">${bar(A.c.l, ca)}${bar(B.c.l, cb)}</div></div></div>` }
+  <div class="prow"><span>Hue</span><div class="bars color-bars"><div>${thumb(a, A.c)}${bar(A.c.h / 360, ca)}</div><div>${thumb(b, B.c)}${bar(B.c.h / 360, cb)}</div></div></div>
+  <div class="prow"><span>Saturation</span><div class="bars color-bars"><div>${thumb(a, A.c)}${bar(A.c.s, ca)}</div><div>${thumb(b, B.c)}${bar(B.c.s, cb)}</div></div></div>
+  <div class="prow"><span>Light</span><div class="bars color-bars"><div>${thumb(a, A.c)}${bar(A.c.l, ca)}</div><div>${thumb(b, B.c)}${bar(B.c.l, cb)}</div></div></div></div>` }
 function mapView(L, box) { const n = L.slice(0, 8); msel = hsel < n.length ? hsel : -1; pair = pair.map(i => Math.min(i, n.length - 1));
-  const seg = `<div class="seg wide"><button class="seg-btn${mapMode === 'wheel' ? ' on' : ''}" data-m="wheel">Wheel</button><button class="seg-btn${mapMode === 'bars' ? ' on' : ''}" data-m="bars">HSL bars</button></div>`;
-  const mx = n.length < 2 ? '' : `<div class="mx" style="--n:${n.length}"><span></span>${n.map((e, i) => thumb(e, facts(e).c, '', i + 1)).join('')}${n.map((a, i) => thumb(a, facts(a).c, '', i + 1) + n.map((b, j) => i === j ? `<span class="mc self" style="--c:${C.css(facts(a).c)}"></span>` : `<button class="mc${pair[0] === i && pair[1] === j ? ' on' : ''}" data-p="${i},${j}" style="--k:${C.cl((rel(a, b).pct - 60) / 40, 0, 1).toFixed(2)}" title="${esc(a.name)} vs ${esc(b.name)}">${rel(a, b).pct}</button>`).join('')).join('')}</div>`;
+  const seg = `<div class="compare-controls"><div class="seg wide"><button class="seg-btn${mapMode === 'wheel' ? ' on' : ''}" data-m="wheel">Wheel</button><button class="seg-btn${mapMode === 'bars' ? ' on' : ''}" data-m="bars">HSL bars</button></div><div class="seg wide"><button class="seg-btn${!selectMap ? ' on' : ''}" data-select="0">Triangle</button><button class="seg-btn${selectMap ? ' on' : ''}" data-select="1">Select</button></div>${!selectMap ? `<label class="toggle-row half-toggle"><span class="toggle-label">Only show half</span><label class="toggle-switch"><input type="checkbox" data-half${halfMap ? ' checked' : ''}><span class="toggle-track"></span></label></label>` : ''}</div>`;
+  const scores = []; for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) scores.push(rel(n[i], n[j]).pct); const lo = Math.min(...scores, 0), hi = Math.max(...scores, 100), norm = p => hi === lo ? 1 : (p - lo) / (hi - lo);
+  const mx = n.length < 2 ? '' : selectMap ? `<div class="select-pairs"><label>First song<select data-pick="0">${n.map((e, i) => `<option value="${i}"${pair[0] === i ? ' selected' : ''}>${esc(e.name)}</option>`).join('')}</select></label><label>Second song<select data-pick="1">${n.map((e, i) => `<option value="${i}"${pair[1] === i ? ' selected' : ''}>${esc(e.name)}</option>`).join('')}</select></label></div>` : `<div class="mx${halfMap ? ' half' : ''}" style="--n:${n.length}"><span></span>${n.map((e, i) => thumb(e, facts(e).c, '', i + 1)).join('')}${n.map((a, i) => thumb(a, facts(a).c, '', i + 1) + n.map((b, j) => i === j ? `<span class="mc self" style="--c:${C.css(facts(a).c)}"></span>` : (halfMap && j < i ? '<span class="mc blank"></span>' : `<button class="mc${pair[0] === i && pair[1] === j ? ' on' : ''}" data-p="${i},${j}" style="--k:${norm(rel(a, b).pct).toFixed(2)}" title="${esc(a.name)} vs ${esc(b.name)}">${rel(a, b).pct}</button>`)).join('')).join('')}</div>`;
   box.innerHTML = seg + `<canvas id="mapcv" class="map-cv" width="360" height="${mapMode === 'wheel' ? 360 : 280}"></canvas>` + mx + (n.length > 1 && pair[0] !== pair[1] ? pairCard(n[pair[0]], n[pair[1]], pair[0], pair[1]) : empty('Load a second song to compare how alike two songs are.'));
   drawMap($('mapcv'), n) }
 function bdayView(L, box) { const H = C.bdayHist(), e = L[hsel];
@@ -147,10 +158,16 @@ function renderHist() { const L = C.hist(), box = $('hist'); hsel = Math.min(hse
 $('htabs').onclick = e => { const t = e.target.closest('[data-t]'); if (t) { htab = t.dataset.t; lsSet('colorseed.htab', htab); renderHist() } };
 $('hist').onclick = e => { const q = s => e.target.closest(s), L = C.hist(); let b;
   if ((b = q('[data-u]'))) { const u = b.dataset.u, p = C.bdayUse(u); C.save(p); C.onSeed(p); C.toast('Using ' + C.fmtD(u)); return }
+  if ((b = q('[data-pick]'))) { pair[+b.dataset.pick] = +b.value; renderHist(); return }
   if ((b = q('[data-m]'))) { mapMode = b.dataset.m; lsSet('colorseed.map', mapMode) }
+  else if ((b = q('[data-songs]'))) { songMode = b.dataset.songs; lsSet('colorseed.songs', songMode) }
+  else if ((b = q('[data-select]'))) { selectMap = b.dataset.select === '1'; lsSet('colorseed.select', selectMap ? '1' : '0') }
+  else if (q('[data-half]')) { halfMap = q('[data-half]').checked; lsSet('colorseed.half', halfMap ? '1' : '0') }
   else if ((b = q('[data-a]'))) { const x = L[hsel], a = b.dataset.a; if (!x) return;
-    if (a === 'copy') { const hex = C.hex(C.color(x.raw, P)); C.copy(hex).then(() => C.toast('Copied ' + hex)); return }
-    if (a === 'card') { C.card(x, P); return }
+    const row = b.closest('[data-i]'); if (row) hsel = +row.dataset.i;
+    const selected = L[hsel]; if (!selected) return;
+    if (a === 'copy') { const hex = C.hex(C.color(selected.raw, P)); C.copy(hex).then(() => C.toast('Copied ' + hex)); return }
+    if (a === 'card') { C.card(selected, P); return }
     L.splice(hsel, 1); C.histSave(L); hsel = 0 }
   else if ((b = q('[data-p]'))) pair = b.dataset.p.split(',').map(Number);
   else if ((b = q('[data-k]'))) bdOff.has(b.dataset.k) ? bdOff.delete(b.dataset.k) : bdOff.add(b.dataset.k);
@@ -184,6 +201,7 @@ function drawHSL() {
   og.textBaseline = 'middle';
   rows.forEach(([lab, val, p, stops], i) => { const y = WY - 78 + i * 78;
     og.font = '700 22px "Space Mono", monospace'; og.textAlign = 'left'; og.fillStyle = 'rgba(255,255,255,.38)'; og.fillText(lab, x0, y);
+    const cover = $('coverimg'); if (cover && !cover.hidden) { og.save(); C.rr(og, 48, y - 16, 32, 32, 7); og.clip(); og.drawImage(cover, 48, y - 16, 32, 32); og.restore() }
     const gr = og.createLinearGradient(tx, 0, tx + tw, 0); stops.forEach(([o, c]) => gr.addColorStop(o, c));
     og.fillStyle = gr; C.rr(og, tx, y - 7, tw, 14, 7); og.fill(); og.lineWidth = 1.5; og.strokeStyle = 'rgba(255,255,255,.14)'; og.stroke();
     og.beginPath(); og.arc(tx + tw * p, y, 12, 0, TAU); og.fillStyle = C.css(cs); og.fill(); og.lineWidth = 3; og.strokeStyle = '#fff'; og.stroke();
