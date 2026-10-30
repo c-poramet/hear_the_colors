@@ -187,11 +187,30 @@ function songCard(e) { const f = facts(e), css = C.css(f.c);
   return `<div class="scard" style="--c:${css}">${thumb(e, f.c, 'lg')}<div class="sc-body"><div class="sc-name">${esc(e.name)}</div><div class="sc-sub">${fmt(e.dur)} · ${e.fp}</div>${hx(f.c)}</div>
   <div class="sc-meters"><div class="mt">${dial(f.a, css, f.key)}<span>Pitch classes</span></div><div class="mt">${bar(f.r, css)}<span>Onset regularity</span></div><div class="mt">${bar(f.c.l, css)}<span>Brightness contrast</span></div></div>
   <div class="sc-act"><button class="btn-reset" data-a="copy">Copy hex</button><button class="btn-reset" data-a="palette">Palette</button><button class="btn-reset" data-a="calibrate">Calibrate</button><button class="btn-reset" data-a="card">Share card</button><button class="btn-reset" data-a="del">Remove</button></div></div>` }
-function calibrateSong(e) {
-  const raw = e.raw, target = C.color(raw, P), base = C.color(raw, { ...P, shift: 0 }), saturation = raw.rr == null ? raw.s0 : raw.rr, lightness = raw.contrast == null ? raw.l0 : raw.contrast;
+function fitSongToColor(e, target) {
+  const raw = e.raw, base = C.color(raw, { ...P, shift: 0 }), saturation = raw.rr == null ? raw.s0 : raw.rr, lightness = raw.contrast == null ? raw.l0 : raw.contrast;
   const shift = (((target.h - base.h) % 360) + 360) % 360;
   P = { ...P, shift, sg: 1, sb: C.cl(target.s - saturation, -1, 1), lg: 1, lb: C.cl(target.l - lightness, -1, 1) };
   C.save(P); C.seedTag(P); renderHist(); C.toast('Seed calibrated to this song');
+}
+function calibrateSong(e) {
+  const current = C.hex(C.color(e.raw, P)), modal = document.createElement('div');
+  modal.className = 'modal'; modal.innerHTML = `<div class="picker-box panel" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+    <div class="panel-title"><span id="picker-title">Calibrate song colour</span><button class="btn-reset" data-picker="close" aria-label="Close colour picker">Close</button></div>
+    <p class="hint">Choose the colour this song should produce. The seed will be fitted without leaving the Play page.</p>
+    <div class="picker-preview" data-picker-preview></div>
+    <label class="picker-input"><span>Target colour</span><input type="color" data-picker-color value="${current}"></label>
+    <div class="btn-row"><button class="btn-reset" data-picker="cancel">Cancel</button><button class="btn-analyze" data-picker="apply">Fit seed</button></div>
+  </div>`;
+  document.body.appendChild(modal);
+  const color = modal.querySelector('[data-picker-color]'), preview = modal.querySelector('[data-picker-preview]');
+  const update = () => { preview.style.background = color.value; preview.textContent = color.value.toUpperCase() };
+  const close = () => modal.remove();
+  modal.querySelector('[data-picker="close"]').onclick = close;
+  modal.querySelector('[data-picker="cancel"]').onclick = close;
+  modal.querySelector('[data-picker="apply"]').onclick = () => { const target = C.fromHex(color.value); close(); fitSongToColor(e, target) };
+  color.oninput = update; modal.onclick = ev => { if (ev.target === modal) close() }; addEventListener('keydown', function key(ev) { if (ev.key === 'Escape') { close(); removeEventListener('keydown', key) } }, { once: true });
+  update(); color.focus();
 }
 function songRow(e, i) { const f = facts(e), css = C.css(f.c); return `<button class="srow${i === hsel ? ' on' : ''}" data-i="${i}" style="--c:${css}"><span class="srow-color" data-row-color title="Click to copy ${C.hex(f.c)} · Shift-click to download a colour square" aria-label="${C.hex(f.c)}" style="background:${css}"><b>${C.hex(f.c)}</b></span><span class="srow-info"><span class="srow-card" data-row-card title="Open share card">${thumb(e, f.c)}</span><span><span class="srow-name">${esc(e.name)}</span><span class="srow-meta">${fmt(e.dur)} · ${f.key} · ${f.rate.toFixed(1)}/s</span></span></span><span class="srow-palette" data-row-palette role="button" tabindex="0" title="Generate colour palettes">Palette</span><span class="srow-calibrate" data-row-calibrate role="button" tabindex="0" title="Fit calibration to this colour">Calibrate</span><span class="srow-remove" data-row-del title="Remove from history" aria-label="Remove ${esc(e.name)}">×</span></button>` }
 function songsView(L, box) { const control = `<div class="view-controls"><span class="hint">Song view</span><div class="seg"><button class="seg-btn${songMode === 'row' ? ' on' : ''}" data-songs="row">Rows</button><button class="seg-btn${songMode === 'card' ? ' on' : ''}" data-songs="card">Cards</button></div></div>`; box.innerHTML = control + (songMode === 'card' ? songCard(L[hsel]) + '<div class="gcards">' + L.map((e, i) => { const c = facts(e).c; return `<button class="gcard${i === hsel ? ' on' : ''}" data-i="${i}">${thumb(e, c)}<span class="gn">${esc(e.name)}</span>${hx(c)}</button>` }).join('') + '</div>' : '<div class="srows">' + L.map(songRow).join('') + '</div>') }
