@@ -107,7 +107,7 @@ function cutUI() {
 }
 $('cutbox').onclick = e => { if (!cut || !fr || !e.target.closest('.cut-row')) return; const hex = C.hex(C.color(C.sum(fr, cut[0], cut[1]), P)); C.copy(hex).then(() => C.toast('Copied ' + hex)) };
 /* ---------- history: songs / compare / birthdays, all card based ---------- */
-let paletteSong = null, paletteClose = null, htab = lsGet('colorseed.htab', 'songs'), mapMode = lsGet('colorseed.map', 'wheel'), songMode = lsGet('colorseed.songs', 'row'), groupBy = lsGet('colorseed.group.by', 'hue'), groupSteps = +lsGet('colorseed.group.steps', '4'), halfMap = lsGet('colorseed.half', '0') === '1', selectMap = lsGet('colorseed.select', '0') === '1', compareMetric = lsGet('colorseed.metric', 'hsl'), hsel = 0, pair = [0, 1], msel = -1; const bdOff = new Set();
+let paletteSong = null, paletteClose = null, htab = lsGet('colorseed.htab', 'songs'), mapMode = lsGet('colorseed.map', 'wheel'), songMode = lsGet('colorseed.songs', 'row'), groupBy = lsGet('colorseed.group.by', 'hue'), groupSteps = +lsGet('colorseed.group.steps', '4'), halfMap = lsGet('colorseed.half', '0') === '1', selectMap = lsGet('colorseed.select', '0') === '1', compareMetric = lsGet('colorseed.metric', 'hsl'), hsel = 0, analysisPair = [0, 1], pair = [0, 1], msel = -1; const bdOff = new Set();
 if (!/^[hsl]+$/.test(compareMetric) || !compareMetric) compareMetric = 'hsl';
 if (!['songs', 'map', 'analysis', 'groups', 'bday'].includes(htab)) htab = 'songs';
 const KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯', 'A♭', 'E♭', 'B♭', 'F'], rad = d => d * Math.PI / 180;
@@ -232,19 +232,28 @@ const pitchWheel = (pc, color) => {
   const resultAngle = Math.atan2(sx, sy), resultRadius = Math.min(78, Math.hypot(sx, sy) * 78), [rx, ry] = polar(resultAngle, resultRadius);
   return `<div class="pitch-wheel-wrap"><svg class="pitch-wheel" viewBox="0 0 240 240" role="img" aria-label="Pitch classes placed on the hue and saturation wheel"><circle cx="120" cy="120" r="92" class="pitch-wheel-ring"></circle>${spokes}<circle cx="${rx.toFixed(1)}" cy="${ry.toFixed(1)}" r="5" fill="${color}" class="pitch-result"></circle><text x="${(rx + 12).toFixed(1)}" y="${(ry - 8).toFixed(1)}" class="pitch-wheel-caption">RESULT</text></svg><div class="pitch-wheel-key"><span><i class="pitch-dot"></i>Pitch class weight</span><span><i class="pitch-centre"></i>Weighted result</span></div></div>`;
 };
-function analysisView(L, box) {
-  const e = L[hsel], raw = e && e.raw, c = e && C.color(raw, P), pc = raw && Array.isArray(raw.pc) ? raw.pc : [], total = pc.reduce((a, b) => a + b, 0) || 1;
-  if (!e) { box.innerHTML = empty('Analyze a song to see how its colour is formed.'); return }
+function analysisPicker(L, slot, selected) {
+  const e = L[selected], c = e ? facts(e).c : null;
+  return `<div class="analysis-song-picker"><span class="analysis-picker-label">Song ${slot + 1}</span><button class="analysis-picker-button" data-analysis-menu="${slot}" aria-expanded="false">${e ? thumb(e, c) + `<span><b>${esc(e.name)}</b><small>${fmt(e.dur)} · ${C.hex(c)}</small></span>` : '<span>Select a song</span>'}<span class="analysis-picker-chevron">⌄</span></button><div class="analysis-song-menu" data-analysis-menu-list="${slot}" hidden>${L.map((x, i) => { const xc = facts(x).c; return `<button data-analysis-song="${slot}" data-i="${i}"${i === selected ? ' class="on"' : ''}>${thumb(x, xc)}<span><b>${esc(x.name)}</b><small>${fmt(x.dur)} · ${C.hex(xc)}</small></span></button>` }).join('')}</div></div>`;
+}
+function analysisDetail(e, label) {
+  const raw = e.raw, c = C.color(raw, P), pc = Array.isArray(raw.pc) ? raw.pc : [], total = pc.reduce((a, b) => a + b, 0) || 1;
   const bins = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
   const maxPc = Math.max(...pc, 1), pitchBars = bins.map((x, i) => `<div title="${x}: ${Math.round((pc[i] || 0) / total * 100)}%"><span>${x}</span><i style="height:${Math.max(2, Math.round(Math.sqrt((pc[i] || 0) / maxPc) * 100))}%"></i><em>${Math.round((pc[i] || 0) / total * 100)}%</em></div>`).join('');
   const fifths = [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5].map(i => `<div><span>${bins[i]}</span><i style="height:${Math.max(2, Math.round(Math.sqrt((pc[i] || 0) / maxPc) * 100))}%"></i></div>`).join('');
   const rhythm = Array.isArray(e.R) && e.R.length ? e.R : [raw.rr == null ? raw.s0 : raw.rr], brightness = Array.isArray(e.L) && e.L.length ? e.L : [raw.contrast == null ? raw.l0 : raw.contrast];
   const rr = raw.rr == null ? raw.s0 : raw.rr, contrast = raw.contrast == null ? raw.l0 : raw.contrast, css = C.css(c);
-  box.innerHTML = `<div class="analysis-picker"><label>Song <select data-analysis-pick>${L.map((x, i) => `<option value="${i}"${i === hsel ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label></div><div class="analysis-head">${thumb(e, c, 'lg')}<div><div class="eyebrow">${esc(e.name)}</div><div class="palette-base">${C.hex(c)}</div><p class="hint">The colour is a compact summary of pitch, timing, and timbral movement.</p></div></div>
-    <div class="analysis-step"><b>1 · Pitch-class distribution → hue</b><p>Energy from all octaves is combined into twelve pitch classes. Each class lands at its circle-of-fifths hue angle; distance from the centre shows its relative weight. The weighted centre points to <strong>${facts(e).key}</strong>. Heights are relative to this song's strongest pitch class while labels show actual share.</p>${pitchWheel(pc, css)}<div class="analysis-subtitle">Chromatic profile</div><div class="pitch-bins relative">${pitchBars}</div><div class="analysis-subtitle">Circle of fifths emphasis</div><div class="pitch-bins fifths-bins">${fifths}</div></div>
+  return `<article class="analysis-column"><div class="analysis-head">${thumb(e, c, 'lg')}<div><div class="eyebrow">${label} · ${esc(e.name)}</div><div class="palette-base">${C.hex(c)}</div><p class="hint">The colour is a compact summary of pitch, timing, and timbral movement.</p></div></div>
+    <div class="analysis-step"><b>1 · Pitch-class distribution → hue</b><p>Each class lands at its circle-of-fifths hue angle; distance from the centre shows its relative weight. The weighted centre points to <strong>${facts(e).key}</strong>.</p>${pitchWheel(pc, css)}<div class="analysis-subtitle">Chromatic profile</div><div class="pitch-bins relative">${pitchBars}</div><div class="analysis-subtitle">Circle of fifths emphasis</div><div class="pitch-bins fifths-bins">${fifths}</div></div>
     <div class="analysis-step"><b>2 · Onset timing → saturation</b><p>Onsets are detected when spectral change rises above the local baseline. Even spacing raises regularity and therefore saturation. Final score: <strong>${Math.round(rr * 100)}%</strong>.</p><div class="analysis-meter">${bar(rr, css)}</div>${analysisSpark(rhythm, css, 'Onset regularity over time')}${analysisStats(rhythm)}</div>
     <div class="analysis-step"><b>3 · Brightness movement → lightness</b><p>Each time slice estimates where energy sits between low and high frequencies. The spread of those estimates becomes brightness contrast. Final score: <strong>${Math.round(contrast * 100)}%</strong>.</p><div class="analysis-meter">${bar(contrast, css)}</div>${analysisSpark(brightness, css, 'Brightness over time')}${analysisStats(brightness)}</div>
-    <div class="analysis-result"><span class="analysis-swatch" style="background:${C.css(c)}"></span><span>Final colour <strong>${C.hex(c)}</strong></span><span>H ${Math.round(c.h)}° · S ${Math.round(c.s * 100)}% · L ${Math.round(c.l * 100)}%</span></div>`;
+    <div class="analysis-result"><span class="analysis-swatch" style="background:${css}"></span><span>Final colour <strong>${C.hex(c)}</strong></span><span>H ${Math.round(c.h)}° · S ${Math.round(c.s * 100)}% · L ${Math.round(c.l * 100)}%</span></div></article>`;
+}
+function analysisView(L, box) {
+  if (!L.length) { box.innerHTML = empty('Analyze a song to compare its colour formation.'); return }
+  analysisPair = analysisPair.map((i, slot) => Math.min(L.length - 1, Math.max(0, Number.isInteger(i) ? i : slot)));
+  if (analysisPair[0] === analysisPair[1] && L.length > 1) analysisPair[1] = analysisPair[0] ? 0 : 1;
+  box.innerHTML = `<div class="analysis-picker-row">${analysisPicker(L, 0, analysisPair[0])}${analysisPicker(L, 1, analysisPair[1])}</div><p class="hint analysis-compare-note">Compare both songs side by side. Each chart uses its own strongest value for readable detail; percentages remain absolute.</p><div class="analysis-columns">${analysisDetail(L[analysisPair[0]], 'A')}${analysisDetail(L[analysisPair[1]], 'B')}</div>`;
 }
 function groupsView(L, box) {
   const value = e => { const c = facts(e).c, r = e.raw.rr == null ? e.raw.s0 : e.raw.rr, l = e.raw.contrast == null ? e.raw.l0 : e.raw.contrast; return groupBy === 'hue' ? c.h / 360 : groupBy === 'saturation' ? r : l };
@@ -315,6 +324,12 @@ function renderHist() { const L = C.hist(), box = $('hist'); hsel = Math.min(hse
   (htab === 'map' ? mapView : htab === 'analysis' ? analysisView : htab === 'groups' ? groupsView : htab === 'bday' ? bdayView : songsView)(L, box) }
 $('htabs').onclick = e => { const t = e.target.closest('[data-t]'); if (t) { htab = t.dataset.t; lsSet('colorseed.htab', htab); renderHist() } };
 $('hist').onclick = e => { const q = s => e.target.closest(s), L = C.hist(); let b;
+  if ((b = q('[data-analysis-menu]'))) {
+    const slot = +b.dataset.analysisMenu, menu = document.querySelector(`[data-analysis-menu-list="${slot}"]`);
+    document.querySelectorAll('.analysis-song-menu').forEach(x => { if (x !== menu) x.hidden = true });
+    menu.hidden = !menu.hidden; b.setAttribute('aria-expanded', String(!menu.hidden)); return;
+  }
+  if ((b = q('[data-analysis-song]'))) { analysisPair[+b.dataset.analysisSong] = +b.dataset.i; renderHist(); return }
   if ((b = q('[data-group-song]'))) { hsel = +b.dataset.groupSong; renderHist(); return }
   if ((b = q('.group-song'))) { hsel = +b.dataset.i; renderHist(); return }
   if ((b = q('[data-u]'))) { const u = b.dataset.u, p = C.bdayUse(u); C.save(p); C.onSeed(p); C.toast('Using ' + C.fmtD(u)); return }
