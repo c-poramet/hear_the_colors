@@ -5,7 +5,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css"></head>
 <body>
-<header class="header"><span class="header-title">Hear &amp; See</span><span class="header-dot"></span><span class="header-sub">calibrate</span><span class="year-indicator off" data-year-indicator aria-live="polite">YEAR OFF</span><span class="keyboard-hints" title="Keyboard shortcuts: Y toggles Include year · [ previous birthday · ] next birthday">Keys: Y · [ ]</span>
+<header class="header"><span class="header-title">Hear &amp; See</span><span class="header-dot"></span><span class="header-sub">calibrate</span><span class="year-indicator off" data-year-indicator aria-live="polite">YEAR OFF</span><span class="year-indicator off" data-logic-indicator aria-live="polite">LEGACY</span><span class="keyboard-hints" title="Keyboard shortcuts: Y toggles Include year · [ previous birthday · ] next birthday">Keys: Y · [ ]</span>
 <a class="mode-link" href="index.html">Play</a><a class="mode-link on" href="calibrate.html">Calibrate</a><button class="guesses-left-badge bday-badge" id="bday"></button><span class="guesses-left-badge" id="tag"></span></header>
 <main class="main"><div class="solver-layout">
 <section class="left-panel panel"><div class="panel-title">Colour wheel</div>
@@ -20,6 +20,9 @@
     <div class="btn-row"><input type="text" id="dob" class="field" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" autocomplete="bday"><button id="gen" class="btn-reset">Generate</button></div>
     <div class="toggle-row"><span class="toggle-label">Include year</span><label class="toggle-switch"><input type="checkbox" id="yr" aria-label="Include year in the calculation"><span class="toggle-track"></span></label></div>
     <p class="hint" id="dobmsg">Same day, same seed. With the year ignored, all 366 calendar days land as far apart as possible.</p></section>
+  <section class="panel"><div class="panel-title">Birthday logic</div>
+    <div class="toggle-row"><span class="toggle-label">Use LEGACY logic</span><label class="toggle-switch"><input type="checkbox" id="legacy" aria-label="Use LEGACY birthday logic"><span class="toggle-track"></span></label></div>
+    <p class="hint">LEGACY keeps the original date mapping. Turn it off for smooth colors: nearby birthdays produce nearby audio colors, with January and December adjacent when the year is excluded.</p></section>
   <section class="panel"><div class="panel-title">Dates for this seed</div><div class="btn-row"><button id="find" class="btn-analyze">Find dates</button></div>
     <p class="hint" id="foundmsg">Lists the dates whose seed gives the closest colours to the current knobs.</p><ul id="found"></ul></section>
   <section class="panel"><div class="panel-title">Share</div>

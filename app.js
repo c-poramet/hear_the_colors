@@ -1,6 +1,7 @@
 const $ = id => document.getElementById(id);
 let P = C.fromHash() || C.load(), songs = [], sel = -1;
 const KN = [['shift', 'Hue shift °', 0, 359, 1], ['sg', 'Saturation gain', 0, 1.5, .01], ['sb', 'Saturation base', -1, 1, .01], ['lg', 'Lightness gain', 0, 1, .01], ['lb', 'Lightness base', -1, 1, .01]];
+C.updateLogicIndicator();
 
 $('knobs').innerHTML = KN.map(k => `<label class="knob"><span>${k[1]}</span><output id="o_${k[0]}"></output><input type="range" id="k_${k[0]}" min="${k[2]}" max="${k[3]}" step="${k[4]}"></label>`).join('')
   + '<div class="toggle-row"><span class="toggle-label">Mirror hue direction</span><label class="toggle-switch"><input type="checkbox" id="k_mir"><span class="toggle-track"></span></label></div>';
@@ -49,20 +50,22 @@ $('files').onchange = async e => {
   $('status').textContent = songs.length + ' song(s) loaded. Nothing is uploaded anywhere.'; e.target.value = '';
 };
 
-const regress = (xs, ys, g0, lo, hi) => { const n = xs.length, mx = xs.reduce((a, b) => a + b) / n, my = ys.reduce((a, b) => a + b) / n;
-  let v = 0, c = 0; xs.forEach((x, i) => { v += (x - mx) ** 2; c += (x - mx) * (ys[i] - my) });
-  const g = n > 1 && v / n > .005 ? C.cl(c / v, lo, hi) : g0; return [g, my - g * mx] };
+const regress = (xs, ys, ws, g0, lo, hi) => { const total = ws.reduce((a, b) => a + b, 0) || 1, mx = xs.reduce((a, x, i) => a + x * ws[i], 0) / total, my = ys.reduce((a, y, i) => a + y * ws[i], 0) / total;
+  let v = 0, c = 0; xs.forEach((x, i) => { v += ws[i] * (x - mx) ** 2; c += ws[i] * (x - mx) * (ys[i] - my) });
+  const g = xs.length > 1 && v / total > .005 ? C.cl(c / v, lo, hi) : g0; return [g, my - g * mx] };
 $('fit').onclick = () => {
   const L = songs.filter(s => s.target); if (!L.length) { $('status').textContent = 'Set a target colour for at least one song first.'; return }
   const T = L.map(s => C.fromHex(s.target));
-  let X = 0, Y = 0; L.forEach((s, i) => { const a = s.c.a * (P.mir ? -1 : 1), d = (T[i].h - a) * Math.PI / 180; X += Math.cos(d); Y += Math.sin(d) });
+  const weights = L.map(s => Math.max(s.fr.n * s.fr.dt, 0.001));
+  let X = 0, Y = 0; L.forEach((s, i) => { const a = s.c.a * (P.mir ? -1 : 1), d = (T[i].h - a) * Math.PI / 180; X += Math.cos(d) * weights[i]; Y += Math.sin(d) * weights[i] });
   P.shift = ((Math.atan2(Y, X) * 180 / Math.PI) % 360 + 360) % 360;
-  [P.sg, P.sb] = regress(L.map(s => s.sum.s0), T.map(t => t.s), P.sg, .1, 1.5);
-  [P.lg, P.lb] = regress(L.map(s => s.sum.l0), T.map(t => t.l), P.lg, 0, 1);
+  [P.sg, P.sb] = regress(L.map(s => s.sum.s0), T.map(t => t.s), weights, P.sg, .1, 1.5);
+  [P.lg, P.lb] = regress(L.map(s => s.sum.l0), T.map(t => t.l), weights, P.lg, 0, 1);
   commit();
 };
 $('reset').onclick = () => { P = { ...C.DEF }; commit() };
 const DOBHINT = $('dobmsg').textContent;
+const logicHint = () => C.logicMode() === 'legacy' ? DOBHINT : 'Nearby birthdays produce nearby colours. With the year ignored, January and December are neighbours on the calendar.';
 $('dob').oninput = e => { const v = e.target.value.replace(/\D/g, '').slice(0, 8);
   e.target.value = [v.slice(0, 2), v.slice(2, 4), v.slice(4)].filter(Boolean).join('/') };
 $('dob').onkeydown = e => { if (e.key === 'Enter') $('gen').click() };
@@ -85,8 +88,11 @@ $('qr').title = 'Scan to open with this seed';
 const FIND = $('foundmsg').textContent, setDob = () => $('dob').placeholder = C.yearMode() ? 'dd/mm/yyyy' : 'dd/mm (year ignored)';
 $('yr').checked = C.yearMode(); setDob();
 $('yr').onchange = e => { C.setYearMode(e.target.checked); setDob(); $('found').innerHTML = ''; $('foundmsg').textContent = FIND; draw() };
+$('legacy').checked = C.logicMode() === 'legacy';
+$('legacy').onchange = e => { C.setLogicMode(e.target.checked ? 'legacy' : 'smooth'); $('found').innerHTML = ''; $('foundmsg').textContent = FIND; $('dobmsg').textContent = logicHint(); draw(); C.toast(e.target.checked ? 'LEGACY logic on' : 'Smooth birthday logic on') };
 $('find').onclick = () => { $('foundmsg').textContent = 'Searching…'; $('found').innerHTML = '';
   C.nearDates(P, C.yearMode(), L => { $('foundmsg').textContent = L[0].pct >= 99 ? 'Exact match first, then the next closest.' : 'No exact date. Closest first:';
     $('found').innerHTML = L.map(x => `<li><i style="background:${C.hex(C.color({ hx: 1, hy: 0, s0: .5, l0: .5 }, C.fromDate(x.d)))}"></i><span>${C.fmtD(x.d)}</span><span>${x.pct}%</span><button class="btn-reset" data-d="${x.d}">Use</button></li>`).join('') }) };
 $('found').onclick = e => { const d = e.target.dataset.d; if (d) { P = C.bdayUse(d); commit(); C.toast('Using ' + C.fmtD(d)) } };
+$('dobmsg').textContent = logicHint();
 draw();

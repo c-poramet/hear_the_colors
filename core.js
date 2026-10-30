@@ -18,6 +18,15 @@ C.dec = s => {
 };
 C.fromHash = () => { const m = location.hash.match(/c=([\d.]+)/), p = m && C.dec(m[1]); if (p) C.save(p); return p };
 C.yearMode = () => { try { return localStorage.getItem('colorseed.year') === '1' } catch (e) { return false } };
+C.logicMode = () => { try { return localStorage.getItem('colorseed.logic') === 'smooth' ? 'smooth' : 'legacy' } catch (e) { return 'legacy' } };
+C.setLogicMode = mode => { const v = mode === 'smooth' ? 'smooth' : 'legacy'; try { localStorage.setItem('colorseed.logic', v) } catch (e) {} C.updateLogicIndicator() };
+C.updateLogicIndicator = () => document.querySelectorAll('[data-logic-indicator]').forEach(el => {
+  const legacy = C.logicMode() === 'legacy';
+  el.textContent = legacy ? 'LEGACY' : 'SMOOTH';
+  el.classList.toggle('on', !legacy);
+  el.classList.toggle('off', legacy);
+  el.setAttribute('aria-label', legacy ? 'Legacy birthday logic' : 'Smooth birthday logic');
+});
 C.updateYearIndicator = () => document.querySelectorAll('[data-year-indicator]').forEach(el => {
   const on = C.yearMode();
   el.textContent = 'YEAR ' + (on ? 'ON' : 'OFF');
@@ -27,7 +36,22 @@ C.updateYearIndicator = () => document.querySelectorAll('[data-year-indicator]')
 });
 C.setYearMode = v => { try { localStorage.setItem('colorseed.year', v ? '1' : '0') } catch (e) {} C.updateYearIndicator() };
 const R5 = [.8566748838545029, .7338918566271260, .6287067210378087, .5385972572236101, .4614027427763898, .3819660112501051];
-C.fromDate = (d, y = C.yearMode()) => { // same day -> same seed. Year ignored (default): the 366 calendar days get evenly spaced hue shifts and the other knobs follow a low-discrepancy sequence, so neighbouring days land far apart. Year included: every calendar date since 1970 gets its own step of that sequence.
+C.fromDate = (d, y = C.yearMode()) => {
+  if (C.logicMode() === 'smooth') {
+    const day = Math.floor(Date.parse(d + 'T00:00:00Z') / 864e5);
+    const yearDay = (Date.UTC(2000, +d.slice(5, 7) - 1, +d.slice(8, 10)) - Date.UTC(2000, 0, 1)) / 864e5;
+    const u = y ? day / 365.2425 : yearDay / 365.2425;
+    const wave = (period, phase = 0) => (Math.sin(TAU * u / period + phase) + 1) / 2;
+    return C.dec(C.enc({
+      shift: ((u * 360) % 360 + 360) % 360,
+      mir: 0,
+      sg: .45 + wave(y ? 5 : 1, 1.4) * .55,
+      sb: -.12 + wave(y ? 3 : 1, 2.2) * .34,
+      lg: .2 + wave(y ? 7 : 1, 3.1) * .55,
+      lb: -.08 + wave(y ? 4 : 1, 4.2) * .36
+    }));
+  }
+  // LEGACY: neighbouring dates intentionally use a low-discrepancy sequence.
   let n, u = null; if (y) n = Math.floor(Date.parse(d + 'T00:00:00Z') / 864e5); else { n = Math.round((Date.UTC(2000, +d.slice(5, 7) - 1, +d.slice(8, 10)) - Date.UTC(2000, 0, 1)) / 864e5); u = (n * 313 % 366) / 366 }
   const f = a => { const v = n * a; return v - Math.floor(v) };
   return C.dec(C.enc({ shift: (u ?? f(R5[0])) * 360, mir: f(R5[5]) > .5 ? 1 : 0, sg: .4 + f(R5[1]) * .6, sb: f(R5[2]) * .3, lg: .25 + f(R5[3]) * .35, lb: .12 + f(R5[4]) * .28 })) };
@@ -191,21 +215,21 @@ C.analyze = async (buf, prog) => {
     const g = Math.hypot(X, Y) || 1; hx[i] = X / g; hy[i] = Y / g; fx[i] = fl;
     lf[i] = cm ? cl(((cen / cm - l40) / span - .35) / .45, 0, 1) : .5;
     sil[i] = Math.sqrt(e / N) < .003 ? 1 : 0;
-    if (!sil[i]) { const z = cv.reduce((a, b) => a + b) || 1; for (let p = 0; p < 12; p++) g12[p] += cv[p] / z }
+    if (!sil[i]) { const z = cv.reduce((a, b) => a + b) || 1; for (let p = 0; p < 12; p++) g12[p] += cv[p] / z * dt }
     if (i % 150 === 0) { prog && prog(i / n); await new Promise(r => setTimeout(r)) }
   }
   let mx = 1e-9; for (let i = 0; i < n; i++) mx = Math.max(mx, fx[i]);
   for (let i = 0; i < n; i++) fx[i] /= mx;
   for (let i = 0; i < n; i++) { const a = Math.max(0, i - 10), b = Math.min(n, i + 11); let m = 0; for (let j = a; j < b; j++) m += fx[j]; m /= b - a;
     on[i] = !sil[i] && fx[i] > m * 1.5 + .05 && fx[i] >= (fx[i - 1] || 0) && fx[i] > (fx[i + 1] || 0) ? 1 : 0 }
-  const cx = new Float64Array(n + 1), cy = new Float64Array(n + 1), cL = new Float64Array(n + 1), cn = new Float64Array(n + 1), co = new Float64Array(n + 1);
+  const cx = new Float64Array(n + 1), cy = new Float64Array(n + 1), cL = new Float64Array(n + 1), cw = new Float64Array(n + 1), co = new Float64Array(n + 1);
   for (let i = 0; i < n; i++) { const s = !sil[i];
-    cx[i + 1] = cx[i] + (s ? hx[i] : 0); cy[i + 1] = cy[i] + (s ? hy[i] : 0); cL[i + 1] = cL[i] + (s ? lf[i] : 0); cn[i + 1] = cn[i] + (s ? 1 : 0); co[i + 1] = co[i] + on[i] }
-  return { n, dt, cx, cy, cl: cL, cn, co, lf, on, sil, g12 };
+    const w = s ? dt : 0; cx[i + 1] = cx[i] + (s ? hx[i] * w : 0); cy[i + 1] = cy[i] + (s ? hy[i] * w : 0); cL[i + 1] = cL[i] + (s ? lf[i] * w : 0); cw[i + 1] = cw[i] + w; co[i + 1] = co[i] + on[i] * dt }
+  return { n, dt, cx, cy, cl: cL, cw, cn: cw, co, lf, on, sil, g12 };
 };
 // averages over sections [a,b): any slice of a song gets its own colour in O(1)
-C.sum = (fr, a = 0, b = fr.n) => { const n = fr.cn[b] - fr.cn[a], t = (b - a) * fr.dt || 1, rate = (fr.co[b] - fr.co[a]) / t;
-  return { hx: n ? (fr.cx[b] - fr.cx[a]) / n : 0, hy: n ? (fr.cy[b] - fr.cy[a]) / n : 0, l0: n ? (fr.cl[b] - fr.cl[a]) / n : .5, s0: 1 - Math.exp(-rate / 5), rate } };
+C.sum = (fr, a = 0, b = fr.n) => { const t = (b - a) * fr.dt || 1, w = fr.cw[b] - fr.cw[a], rate = (fr.co[b] - fr.co[a]) / t;
+  return { hx: w ? (fr.cx[b] - fr.cx[a]) / w : 0, hy: w ? (fr.cy[b] - fr.cy[a]) / w : 0, l0: w ? (fr.cl[b] - fr.cl[a]) / w : .5, s0: 1 - Math.exp(-rate / 5), rate } };
 
 /* ---------- wheel ---------- */
 C.wheel = (cv, items) => {
@@ -233,8 +257,8 @@ C.wheelPos = (cv, e) => { const r = cv.getBoundingClientRect(), S = cv.width, k 
 const SEG = 16;
 C.contour = fr => { const L = [], R = [];
   for (let q = 0; q < SEG; q++) { const a = Math.floor(q * fr.n / SEG), b = Math.max(a + 1, Math.floor((q + 1) * fr.n / SEG)); let l = 0, c = 0, o = 0;
-    for (let i = a; i < b; i++) { if (!fr.sil[i]) { l += fr.lf[i]; c++ } o += fr.on[i] }
-    L.push(c ? l / c : .5); R.push(1 - Math.exp(-(o / ((b - a) * fr.dt)) / 5)) }
+    for (let i = a; i < b; i++) { if (!fr.sil[i]) { l += fr.lf[i] * fr.dt; c += fr.dt } o += fr.on[i] * fr.dt }
+    L.push(c ? l / c : .5); R.push(1 - Math.exp(-((o / ((b - a) * fr.dt)) / 5)) ) }
   return { L, R } };
 C.fingerprint = fr => {
   const { L, R } = C.contour(fr), mean = x => x.reduce((a, b) => a + b) / x.length, tot = fr.g12.reduce((a, b) => a + b) || 1, mL = mean(L), mR = mean(R);

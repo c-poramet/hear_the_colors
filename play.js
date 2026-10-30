@@ -4,6 +4,7 @@ const au = $('au'), st = $('strip'), sg = st.getContext('2d'), vz = $('viz'), og
 const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v } catch (e) { return d } }, lsSet = (k, v) => { try { localStorage.setItem(k, v) } catch (e) {} };
 document.querySelectorAll('.mode-link').forEach(a => a.href += location.hash);
 C.seedTag(P);
+C.updateLogicIndicator();
 C.onSeed = p => { P = p; history.replaceState(null, '', location.pathname + location.search);
  document.querySelectorAll('.mode-link').forEach(a => a.href = a.getAttribute('href').split('#')[0]); C.seedTag(P); renderHist(); cutUI(); if (paletteSong) showPalettes(paletteSong) };
 
