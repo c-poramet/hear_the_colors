@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Color Seed – Calibrate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css"></head>
+<body>
+<header class="header"><span class="header-title">Color Seed</span><span class="header-dot"></span><span class="header-sub">calibrate</span>
+<a class="mode-link" href="index.html">Play</a><a class="mode-link on" href="calibrate.html">Calibrate</a><button class="guesses-left-badge bday-badge" id="bday" hidden></button><span class="guesses-left-badge" id="tag"></span></header>
+<main class="main"><div class="solver-layout">
+<section class="left-panel panel"><div class="panel-title">Colour wheel</div>
+  <canvas id="wheel" class="big-wheel" width="360" height="360"></canvas>
+  <p class="hint">Filled dots are where songs land now, rings are where you want them. Select a song, then click or drag the wheel to set its target.</p></section>
+<div class="right-panel">
+  <section class="panel"><div class="panel-title">Songs</div><input type="file" id="files" accept="audio/*" multiple>
+    <p id="status" class="hint">Audio never leaves your device.</p><ul id="list"></ul>
+    <div class="btn-row"><button id="fit" class="btn-analyze">Fit seed to targets</button><button id="reset" class="btn-reset">Reset</button></div></section>
+  <section class="panel"><div class="panel-title">Knobs</div><div id="knobs"></div></section>
+  <section class="panel"><div class="panel-title">Seed from date of birth</div>
+    <div class="btn-row"><input type="text" id="dob" class="field" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" autocomplete="bday"><button id="gen" class="btn-reset">Generate</button></div>
+    <p class="hint" id="dobmsg">Same date, same seed. Neighbouring dates land as far apart as possible.</p></section>
+  <section class="panel"><div class="panel-title">Share</div>
+    <div class="btn-row"><input id="code" class="field" readonly><button id="copy" class="btn-reset">Copy link</button></div>
+    <canvas id="qr" title="Scan to open with this seed"></canvas>
+    <div class="btn-row"><button id="dl" class="btn-reset">Download QR</button></div>
+    <div class="btn-row"><input id="imp" class="field" placeholder="paste a seed code or link"><button id="apply" class="btn-reset">Import</button></div></section>
+</div></div></main>
+<footer class="footer"><span class="footer-credit">Color Seed · see music, hear colour</span></footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="core.js"></script><script src="app.js"></script>
+</body></html>

@@ -1,30 +1,37 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Color Seed – Calibrate</title>
+<title>Color Seed – Play</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css"></head>
 <body>
-<header class="header"><span class="header-title">Color Seed</span><span class="header-dot"></span><span class="header-sub">calibrate</span>
-<a class="mode-link on" href="index.html">Calibrate</a><a class="mode-link" href="play.html">Play</a><span class="guesses-left-badge" id="tag"></span></header>
+<header class="header"><span class="header-title">Color Seed</span><span class="header-dot" id="dot"></span><span class="header-sub">play</span>
+<a class="mode-link on" href="index.html">Play</a><a class="mode-link" href="calibrate.html">Calibrate</a><button class="guesses-left-badge bday-badge" id="bday" hidden></button><span class="guesses-left-badge" id="tag"></span></header>
 <main class="main"><div class="solver-layout">
-<section class="left-panel panel"><div class="panel-title">Colour wheel</div>
-  <canvas id="wheel" class="big-wheel" width="360" height="360"></canvas>
-  <p class="hint">Filled dots are where songs land now, rings are where you want them. Select a song, then click or drag the wheel to set its target.</p></section>
+<section class="left-panel panel stage" id="stage">
+  <div class="panel-title">Now playing <span id="song">nothing loaded</span></div>
+  <canvas id="orb" width="640" height="640"></canvas>
+  <div class="stats-bar compact">
+    <div class="stat-chip"><span class="stat-val" id="sH">–</span><span class="stat-lbl">hue</span></div>
+    <div class="stat-chip"><span class="stat-val" id="sS">–</span><span class="stat-lbl">saturation</span></div>
+    <div class="stat-chip"><span class="stat-val" id="sL">–</span><span class="stat-lbl">lightness</span></div>
+    <div class="stat-chip"><span class="stat-val" id="sR">–</span><span class="stat-lbl">hits / s</span></div></div>
+  <div class="transport">
+    <button class="play-btn" id="pp" aria-label="Play or pause">
+      <svg class="i-play" width="18" height="18" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg>
+      <svg class="i-pause" width="18" height="18" viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z" fill="currentColor"/></svg></button>
+    <span class="mono" id="time">0:00 / 0:00</span>
+    <label class="btn-reset load-btn">Load audio<input type="file" id="file" accept="audio/*" hidden></label></div>
+  <audio id="au" hidden></audio>
+  <canvas id="strip" width="800" height="56"></canvas>
+  <p class="hint" id="status">Click to seek, drag to cut a piece. Space plays and pauses.</p>
+</section>
 <div class="right-panel">
-  <section class="panel"><div class="panel-title">Songs</div><input type="file" id="files" accept="audio/*" multiple>
-    <p id="status" class="hint">Audio never leaves your device.</p><ul id="list"></ul>
-    <div class="btn-row"><button id="fit" class="btn-analyze">Fit seed to targets</button><button id="reset" class="btn-reset">Reset</button></div></section>
-  <section class="panel"><div class="panel-title">Knobs</div><div id="knobs"></div></section>
-  <section class="panel"><div class="panel-title">Seed from date of birth</div>
-    <div class="btn-row"><input type="date" id="dob"><button id="gen" class="btn-reset">Generate</button></div>
-    <p class="hint">Same date, same seed. Neighbouring dates land as far apart as possible.</p></section>
-  <section class="panel"><div class="panel-title">Share</div>
-    <div class="btn-row"><input id="code" class="field" readonly><button id="copy" class="btn-reset">Copy link</button></div>
-    <canvas id="qr" title="Scan to open with this seed"></canvas>
-    <div class="btn-row"><button id="dl" class="btn-reset">Download QR</button></div>
-    <div class="btn-row"><input id="imp" class="field" placeholder="paste a seed code or link"><button id="apply" class="btn-reset">Import</button></div></section>
+  <section class="panel"><div class="panel-title">Cut <button class="btn-reset" id="cclr">Clear</button></div>
+    <div id="cutbox"></div>
+    <div class="toggle-row"><span class="toggle-label">Loop the cut</span><label class="toggle-switch"><input type="checkbox" id="loop"><span class="toggle-track"></span></label></div></section>
+  <section class="panel"><div class="panel-title">History <button class="btn-reset" id="hclr">Clear</button></div><div id="hist"></div></section>
 </div></div></main>
 <footer class="footer"><span class="footer-credit">Color Seed · see music, hear colour</span></footer>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="core.js"></script><script src="app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+<script src="core.js"></script><script src="play.js"></script>
 </body></html>

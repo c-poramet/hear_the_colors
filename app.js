@@ -21,7 +21,7 @@ function draw() {
   $('list').innerHTML = songs.map((s, i) => `<li class="${i === sel ? 'sel' : ''}" data-i="${i}"><i style="background:${C.css(s.c)}"></i><span>${i + 1}. ${s.name}</span>
     <input type="color" value="${s.target || C.hex(s.c)}" data-t="${i}" title="target colour"><button class="btn-reset" data-x="${i}" title="clear target">✕</button></li>`).join('');
   const code = C.enc(P), url = location.href.split('#')[0].replace(/[^/]*$/, 'index.html') + '#c=' + code;
-  $('code').value = url; $('tag').textContent = 'SEED ' + code;
+  $('code').value = url; C.seedTag(P);
   $('qr').style.display = C.qr($('qr'), url) ? '' : 'none';
 }
 
@@ -59,7 +59,13 @@ $('fit').onclick = () => {
   commit();
 };
 $('reset').onclick = () => { P = { ...C.DEF }; commit() };
-$('gen').onclick = () => { if ($('dob').value) { P = C.fromDate($('dob').value); commit() } };
+const DOBHINT = $('dobmsg').textContent;
+$('dob').oninput = e => { const v = e.target.value.replace(/\D/g, '').slice(0, 8);
+  e.target.value = [v.slice(0, 2), v.slice(2, 4), v.slice(4)].filter(Boolean).join('/') };
+$('dob').onkeydown = e => { if (e.key === 'Enter') $('gen').click() };
+$('gen').onclick = () => { const iso = C.parseDMY($('dob').value);
+  if (!iso) { $('dobmsg').textContent = 'Enter a real date as dd/mm/yyyy.'; return }
+  $('dobmsg').textContent = DOBHINT; P = C.fromDate(iso); commit() };
 $('copy').onclick = () => navigator.clipboard.writeText($('code').value).then(() => $('copy').textContent = 'Copied ✓', () => $('code').select());
 $('dl').onclick = () => $('qr').toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'seed-' + C.enc(P) + '.png'; a.click() });
 $('apply').onclick = () => { const m = $('imp').value.match(/c=([\d.]+)/), p = C.dec(m ? m[1] : $('imp').value);

@@ -23,6 +23,38 @@ C.fromDate = d => { // same date -> same seed; consecutive days are spread as fa
   return C.dec(C.enc({ shift: u * 360, mir: f(.3819660112501051) > .5 ? 1 : 0, sg: .4 + v * .6, sb: w * .3, lg: .25 + x * .35, lb: .12 + y * .28 }));
 };
 
+/* ---------- birthdays ---------- */
+const dmy = iso => iso.slice(8) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4);
+C.parseDMY = s => { const m = String(s).trim().match(/^(\d{1,2})[\/.\-\s](\d{1,2})[\/.\-\s](\d{4})$/); if (!m) return null;
+  const d = +m[1], mo = +m[2], y = +m[3], t = new Date(Date.UTC(y, mo - 1, d));
+  if (t.getUTCFullYear() !== y || t.getUTCMonth() !== mo - 1 || t.getUTCDate() !== d) return null;
+  return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0') };
+let BD = null; // seed code -> every date (1900-2030) that generates it; built once, on first use
+C.bdays = code => { if (!BD) { BD = new Map();
+    for (let n = Date.UTC(1900, 0, 1) / 864e5, z = Date.UTC(2030, 11, 31) / 864e5; n <= z; n++) {
+      const iso = new Date(n * 864e5).toISOString().slice(0, 10), k = C.enc(C.fromDate(iso)); BD.has(k) ? BD.get(k).push(iso) : BD.set(k, [iso]) } }
+  return BD.get(code) || [] };
+C.seedTag = p => { const el = id => document.getElementById(id), code = C.enc(p), b = el('bday'), t = el('tag'), d = C.bdays(code);
+  let pop = el('bpop');
+  if (!pop) { pop = document.createElement('div'); pop.id = 'bpop'; pop.className = 'bday-pop'; pop.hidden = true; document.body.appendChild(pop);
+    b.onclick = () => pop.hidden = !pop.hidden;
+    addEventListener('click', e => { if (e.target !== b && !pop.contains(e.target)) pop.hidden = true });
+    addEventListener('keydown', e => { if (e.key === 'Escape') pop.hidden = true }) }
+  t.textContent = 'SEED ' + code;
+  b.hidden = !d.length; if (!d.length) pop.hidden = true;
+  b.textContent = d.length > 1 ? 'BIRTHDAY ×' + d.length : 'BIRTHDAY';
+  pop.innerHTML = `<div class="bday-head">${d.length > 1 ? d.length + ' birthdays, one seed' : 'Birthday seed'}</div><div class="bday-list">${d.slice(0, 60).map(x => `<span>${dmy(x)}</span>`).join('')}</div>`
+    + (d.length > 60 ? `<div class="bday-more">+${d.length - 60} more</div>` : '') };
+
+/* ---------- cover art (embedded tags, via jsmediatags) -> 96px jpeg data url ---------- */
+C.cover = f => new Promise(res => { if (!window.jsmediatags) return res(null);
+  try { jsmediatags.read(f, { onError: () => res(null), onSuccess: t => { const p = t.tags && t.tags.picture; if (!p) return res(null);
+    const url = URL.createObjectURL(new Blob([new Uint8Array(p.data)], { type: p.format || 'image/jpeg' })), im = new Image();
+    im.onerror = () => { URL.revokeObjectURL(url); res(null) };
+    im.onload = () => { const S = 96, k = Math.min(im.width, im.height), c = document.createElement('canvas'); c.width = c.height = S;
+      c.getContext('2d').drawImage(im, (im.width - k) / 2, (im.height - k) / 2, k, k, 0, 0, S, S); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', .72)) };
+    im.src = url } }) } catch (e) { res(null) } });
+
 /* ---------- colour ---------- */
 const hsl2rgb = (h, s, l) => { const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
   return [0, 8, 4].map(n => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))))) };
@@ -124,10 +156,12 @@ C.sim = (a, b) => { let d = 0; for (let i = 0; i < 16; i++) { let x = parseInt(a
 /* ---------- history (localStorage) ---------- */
 const HK = 'colorseed.history.v1';
 C.hist = () => { try { return JSON.parse(localStorage.getItem(HK)) || [] } catch (e) { return [] } };
-C.histAdd = (name, fr) => {
+C.histAdd = (name, fr, art) => {
   const f = C.fingerprint(fr), s = C.sum(fr), H = C.hist(), r = (x, d) => +x.toFixed(d);
   const e = { name, fp: f.fp, L: f.L.map(x => r(x, 2)), R: f.R.map(x => r(x, 2)), raw: { hx: r(s.hx, 4), hy: r(s.hy, 4), l0: r(s.l0, 4), s0: r(s.s0, 4) }, dur: Math.round(fr.n * fr.dt), t: Date.now() };
-  const i = H.findIndex(x => x.fp === e.fp || (x.name === name && C.sim(x.fp, e.fp) > .9)); if (i >= 0) H.splice(i, 1);
+  const i = H.findIndex(x => x.fp === e.fp || (x.name === name && C.sim(x.fp, e.fp) > .9));
+  if (art) e.art = art; else if (i >= 0 && H[i].art) e.art = H[i].art;
+  if (i >= 0) H.splice(i, 1);
   H.unshift(e); C.histSave(H); return { e, H } };
 C.histSave = H => { try { localStorage.setItem(HK, JSON.stringify(H.slice(0, 60))) } catch (e) {} };
 C.glyph = (cv, e, col) => { // 64 ticks = the fingerprint bits; inner shape = the song's busyness/brightness contour
