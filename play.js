@@ -107,7 +107,8 @@ function cutUI() {
 }
 $('cutbox').onclick = e => { if (!cut || !fr || !e.target.closest('.cut-row')) return; const hex = C.hex(C.color(C.sum(fr, cut[0], cut[1]), P)); C.copy(hex).then(() => C.toast('Copied ' + hex)) };
 /* ---------- history: songs / compare / birthdays, all card based ---------- */
-let htab = lsGet('colorseed.htab', 'songs'), mapMode = lsGet('colorseed.map', 'wheel'), songMode = lsGet('colorseed.songs', 'row'), halfMap = lsGet('colorseed.half', '0') === '1', selectMap = lsGet('colorseed.select', '0') === '1', compareMetric = lsGet('colorseed.metric', 'all'), hsel = 0, pair = [0, 1], msel = -1; const bdOff = new Set();
+let htab = lsGet('colorseed.htab', 'songs'), mapMode = lsGet('colorseed.map', 'wheel'), songMode = lsGet('colorseed.songs', 'row'), halfMap = lsGet('colorseed.half', '0') === '1', selectMap = lsGet('colorseed.select', '0') === '1', compareMetric = lsGet('colorseed.metric', 'hsl'), hsel = 0, pair = [0, 1], msel = -1; const bdOff = new Set();
+if (!/^[hsl]+$/.test(compareMetric) || !compareMetric) compareMetric = 'hsl';
 if (!['songs', 'map', 'bday'].includes(htab)) htab = 'songs';
 const KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯', 'A♭', 'E♭', 'B♭', 'F'], rad = d => d * Math.PI / 180;
 // hue = place on the circle of fifths (key area), saturation = rhythmic density, lightness = timbre brightness
@@ -115,10 +116,13 @@ const facts = e => { const c = C.color(e.raw, P), a = (c.a + 360) % 360; return 
 const rel = (x, y) => { const A = facts(x), B = facts(y), d = Math.abs(A.a - B.a), st = Math.min(d, 360 - d) / 30;
   return { A, B, st, pct: Math.round(100 * (1 - (.5 * st / 6 + .25 * Math.abs(A.c.s - B.c.s) + .25 * Math.abs(A.c.l - B.c.l)))) } };
 const metricPct = (x, y) => {
-  if (compareMetric === 'all') return rel(x, y).pct;
   const a = facts(x).c, b = facts(y).c;
-  const delta = compareMetric === 'h' ? Math.min(Math.abs(a.h - b.h), 360 - Math.abs(a.h - b.h)) / 180 : Math.abs(a[compareMetric] - b[compareMetric]);
-  return Math.round((1 - delta) * 100);
+  const metrics = compareMetric.split('');
+  const scores = metrics.map(metric => {
+    const delta = metric === 'h' ? Math.min(Math.abs(a.h - b.h), 360 - Math.abs(a.h - b.h)) / 360 : Math.abs(a[metric] - b[metric]);
+    return 1 - delta;
+  });
+  return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length * 100);
 };
 const gl = {}, glyphURL = (e, col) => { const k = e.fp + col; if (!gl[k]) { const t = document.createElement('canvas'); t.width = t.height = 120; C.glyph(t, e, col); gl[k] = t.toDataURL() } return gl[k] };
 const hx = c => `<span class="hx"><i style="background:${C.css(c)}"></i>${C.hex(c)}</span>`;
@@ -164,13 +168,13 @@ function mapView(L, box) { const n = L.slice(0, 8); msel = hsel < n.length ? hse
     }
     if (b.dataset.m) { mapMode = b.dataset.m; lsSet('colorseed.map', mapMode) }
     else if (b.dataset.select) { selectMap = b.dataset.select === '1'; lsSet('colorseed.select', selectMap ? '1' : '0') }
-    else if (b.dataset.metric) { compareMetric = b.dataset.metric; lsSet('colorseed.metric', compareMetric) }
+    else if (b.dataset.metric) { compareMetric = b.dataset.metric === 'all' ? 'hsl' : b.dataset.metric; lsSet('colorseed.metric', compareMetric) }
     else { halfMap = b.checked; lsSet('colorseed.half', halfMap ? '1' : '0') }
     renderHist();
   };
   const seg = '';
   const scores = []; for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) scores.push(metricPct(n[i], n[j])); const lo = Math.min(...scores), hi = Math.max(...scores), norm = p => hi === lo ? 1 : (p - lo) / (hi - lo);
-  const metric = `<div class="compare-metric" aria-label="Comparison metric"><span>Compare by</span><div class="seg"><button class="seg-btn${compareMetric === 'all' ? ' on' : ''}" data-metric="all">All</button><button class="seg-btn${compareMetric === 'h' ? ' on' : ''}" data-metric="h">H</button><button class="seg-btn${compareMetric === 's' ? ' on' : ''}" data-metric="s">S</button><button class="seg-btn${compareMetric === 'l' ? ' on' : ''}" data-metric="l">L</button></div></div>`;
+  const metric = `<div class="compare-metric" aria-label="Comparison channels"><span>Compare by</span><div class="seg"><button class="seg-btn${compareMetric === 'hsl' ? ' on' : ''}" data-metric="all">All</button><button class="seg-btn${compareMetric.includes('h') ? ' on' : ''}" data-metric="h">H</button><button class="seg-btn${compareMetric.includes('s') ? ' on' : ''}" data-metric="s">S</button><button class="seg-btn${compareMetric.includes('l') ? ' on' : ''}" data-metric="l">L</button></div></div>`;
   const mx = n.length < 2 ? '' : selectMap ? `<div class="select-pairs"><label>First song<select data-pick="0">${n.map((e, i) => `<option value="${i}"${pair[0] === i ? ' selected' : ''}>${esc(e.name)}</option>`).join('')}</select></label><label>Second song<select data-pick="1">${n.map((e, i) => `<option value="${i}"${pair[1] === i ? ' selected' : ''}>${esc(e.name)}</option>`).join('')}</select></label></div>` : `<div class="mx${halfMap ? ' half' : ''}" style="--n:${n.length}"><span></span>${n.map((e, i) => thumb(e, facts(e).c, '', i + 1)).join('')}${n.map((a, i) => thumb(a, facts(a).c, '', i + 1) + n.map((b, j) => i === j ? `<span class="mc self" style="--c:${C.css(facts(a).c)}"></span>` : (halfMap && j < i ? '<span class="mc blank"></span>' : `<button class="mc${pair[0] === i && pair[1] === j ? ' on' : ''}" data-p="${i},${j}" style="--k:${norm(metricPct(a, b)).toFixed(2)}" title="${esc(a.name)} vs ${esc(b.name)}">${metricPct(a, b)}</button>`)).join('')).join('')}</div>`;
   const chart = mapMode === 'wheel' ? '<canvas id="mapcv" class="map-cv" width="360" height="360"></canvas>' : hslBars(n);
   box.innerHTML = seg + chart + metric + mx + (n.length > 1 && pair[0] !== pair[1] ? pairCard(n[pair[0]], n[pair[1]], pair[0], pair[1]) : empty('Load a second song to compare how alike two songs are.'));
@@ -205,7 +209,11 @@ $('hist').onclick = e => { const q = s => e.target.closest(s), L = C.hist(); let
   if ((b = q('[data-m]'))) { mapMode = b.dataset.m; lsSet('colorseed.map', mapMode) }
   else if ((b = q('[data-songs]'))) { songMode = b.dataset.songs; lsSet('colorseed.songs', songMode) }
   else if ((b = q('[data-select]'))) { selectMap = b.dataset.select === '1'; lsSet('colorseed.select', selectMap ? '1' : '0') }
-  else if ((b = q('[data-metric]'))) { compareMetric = b.dataset.metric; lsSet('colorseed.metric', compareMetric) }
+  else if ((b = q('[data-metric]'))) {
+    compareMetric = b.dataset.metric === 'all' ? 'hsl' : compareMetric.includes(b.dataset.metric) ? compareMetric.replace(b.dataset.metric, '') : compareMetric + b.dataset.metric;
+    if (!compareMetric) compareMetric = b.dataset.metric;
+    lsSet('colorseed.metric', compareMetric)
+  }
   else if (q('[data-half]')) { halfMap = q('[data-half]').checked; lsSet('colorseed.half', halfMap ? '1' : '0') }
   else if ((b = q('[data-a]'))) { const x = L[hsel], a = b.dataset.a; if (!x) return;
     const row = b.closest('[data-i]'); if (row) hsel = +row.dataset.i;
